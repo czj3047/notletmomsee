@@ -82,11 +82,7 @@
     height: 20px;
     margin: 0 2px;
   }
-<!-- 访问量统计 -->
-<script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
-<div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; color: #666;">
-  总访问：<span id="busuanzi_value_site_pv"></span> 次 | 访客：<span id="busuanzi_value_site_uv"></span> 人
-</div>
+
   @keyframes floatUp {
     0% { opacity: 1; transform: translateY(0); }
     100% { opacity: 0; transform: translateY(-30px); }
@@ -148,10 +144,13 @@
       </div>
     </div>
 
-    <!-- 妈妈血量 -->
+    <!-- 妈妈血量 + 形态 + 玩家数 -->
     <div class="bg-white/90 rounded-lg p-3 border-4 border-red-400 shadow-lg text-center">
       <div class="text-red-500 font-bold text-sm mb-1">👩 妈妈</div>
-      <div id="momHp" class="flex justify-center"></div>
+      <div id="momHp" class="flex justify-center mb-1"></div>
+      <div id="morphStatus" class="text-xs text-purple-600 font-bold">普通形态</div>
+      <div id="playerCount" class="text-xs text-green-600 font-bold mt-1">当前玩家：2人</div>
+      <div id="playCount" class="text-xs text-amber-600 font-bold mt-1">历史游玩：0人</div>
     </div>
 
     <!-- 爸爸状态 -->
@@ -172,17 +171,18 @@
     <div>👨 WASD移动 / 空格攻击</div>
     <div>👧 ↑↓←→移动 / Q水盾</div>
     <div>ESC 暂停</div>
-    <div class="text-amber-600 mt-1 border-t border-gray-300 pt-1">作者：悦如 v5</div>
+    <div class="text-amber-600 mt-1 border-t border-gray-300 pt-1">作者：悦如 v11</div>
   </div>
 
   <!-- 开始界面 -->
   <div id="menuScreen" class="absolute inset-0 flex flex-col items-center justify-center modal-overlay z-20">
     <div class="bg-gradient-to-b from-amber-100 to-orange-100 p-8 rounded-2xl border-8 border-amber-600 shadow-2xl text-center max-w-lg">
       <h1 class="text-5xl font-bold text-amber-800 mb-1" style="text-shadow: 3px 3px 0 hsl(30, 80%, 70%);">
-        不能被妈妈发现 <span class="text-2xl align-super">v5</span>
+        不能被妈妈发现 <span class="text-2xl align-super">v11</span>
       </h1>
       <p class="text-amber-700 mb-1 text-lg">双人潜行合作游戏</p>
-      <p class="text-amber-600 mb-6 text-sm">作者：悦如</p>
+      <p class="text-amber-600 mb-2 text-sm">作者：悦如</p>
+      <p id="menuPlayCount" class="text-amber-500 mb-6 text-xs">历史游玩人数：0人</p>
 
       <div class="bg-white/60 rounded-lg p-4 mb-6 text-left text-sm text-gray-700">
         <div class="font-bold text-amber-800 mb-2">🎮 游戏目标</div>
@@ -293,8 +293,8 @@ const MAP_H = 32;
 const CANVAS_W = MAP_W * TILE;
 const CANVAS_H = MAP_H * TILE;
 
-const GIRL_SPEED = 6.0;
-const DAD_SPEED = 5.2;
+const GIRL_SPEED = 8.5;
+const DAD_SPEED = 7.5;
 const MOM_SPEED = 2.8;
 
 const VIEW_ANGLE = Math.PI * 2 / 3; // 120度
@@ -310,52 +310,83 @@ const MAX_HP_GIRL = 5;
 const MAX_HP_NORMAL = 3;
 const MOM_MAX_HP = 3;
 
+// ---------- 妈妈形态进化系统 ----------
+const MORPH_INTERVAL = 30000; // 每30秒变形一次
+const WEB_DURATION = 60000;   // 蜘蛛网持续60秒
+const WEB_SPAWN_INTERVAL = 3000; // 蜘蛛形态每3秒吐一次网
+
+// 形态定义：normal / spider / clones2 / clones3 / spider2
+const MORPH_SEQUENCE = [
+  'normal',   // 0-30s
+  'spider',   // 30-60s
+  'clones2',  // 60-90s
+  'normal',   // 90-120s
+  'clones3',  // 120-150s
+  'normal',   // 150-180s
+  'spider2',  // 180-210s
+];
+
 // ---------- 题库 ----------
 const QUESTIONS = {
   math: [
-    { q: '25 + 37 = ?', options: ['52', '62', '72', '58'], answer: 1 },
-    { q: '81 - 45 = ?', options: ['36', '46', '34', '44'], answer: 0 },
+    { q: '245 + 138 = ?', options: ['373', '383', '393', '363'], answer: 1 },
+    { q: '500 - 237 = ?', options: ['263', '273', '253', '363'], answer: 0 },
     { q: '7 × 8 = ?', options: ['54', '56', '64', '48'], answer: 1 },
-    { q: '63 + 28 = ?', options: ['81', '91', '101', '85'], answer: 1 },
-    { q: '90 - 57 = ?', options: ['33', '43', '37', '23'], answer: 0 },
-    { q: '6 × 9 = ?', options: ['48', '52', '54', '56'], answer: 2 },
-    { q: '47 + 53 = ?', options: ['90', '100', '110', '97'], answer: 1 },
-    { q: '72 - 38 = ?', options: ['34', '44', '32', '46'], answer: 0 },
-    { q: '4 × 7 = ?', options: ['28', '32', '24', '36'], answer: 0 },
-    { q: '56 + 44 = ?', options: ['90', '100', '110', '80'], answer: 1 },
-    { q: '85 - 29 = ?', options: ['56', '66', '54', '64'], answer: 0 },
-    { q: '9 × 9 = ?', options: ['72', '81', '90', '63'], answer: 1 },
-    { q: '38 + 47 = ?', options: ['75', '85', '95', '82'], answer: 1 },
-    { q: '100 - 67 = ?', options: ['33', '43', '23', '37'], answer: 0 },
-    { q: '5 × 8 = ?', options: ['35', '45', '40', '50'], answer: 2 },
+    { q: '36 ÷ 4 = ?', options: ['8', '9', '7', '6'], answer: 1 },
+    { q: '156 + 289 = ?', options: ['435', '445', '455', '345'], answer: 1 },
+    { q: '420 - 156 = ?', options: ['264', '274', '254', '364'], answer: 0 },
+    { q: '9 × 6 = ?', options: ['48', '52', '54', '56'], answer: 2 },
+    { q: '63 ÷ 7 = ?', options: ['7', '8', '9', '6'], answer: 2 },
+    { q: '一个长方形长8厘米，宽5厘米，周长是多少厘米？', options: ['13厘米', '26厘米', '40厘米', '20厘米'], answer: 1 },
+    { q: '325 + 478 = ?', options: ['793', '803', '813', '703'], answer: 1 },
+    { q: '700 - 345 = ?', options: ['355', '365', '455', '345'], answer: 0 },
+    { q: '12 × 5 = ?', options: ['50', '60', '70', '55'], answer: 1 },
+    { q: '48 ÷ 6 = ?', options: ['6', '7', '8', '9'], answer: 2 },
+    { q: '正方形边长是6厘米，面积是多少平方厘米？', options: ['24', '36', '12', '30'], answer: 1 },
+    { q: '小明有156颗糖，妈妈又给了他89颗，一共有多少颗？', options: ['235', '245', '255', '225'], answer: 1 },
+    { q: '一本书有200页，小红看了138页，还剩多少页？', options: ['62', '72', '52', '82'], answer: 0 },
+    { q: '8 × 7 + 15 = ?', options: ['61', '71', '51', '81'], answer: 1 },
+    { q: '100 - 6 × 8 = ?', options: ['42', '52', '62', '32'], answer: 1 },
   ],
   chinese: [
-    { q: '"春"字可以组成哪个词？', options: ['春天', '春饭', '春跑', '春睡'], answer: 0 },
     { q: '"画蛇添___" 成语填空', options: ['手', '脚', '足', '头'], answer: 2 },
-    { q: '"明"字的部首是？', options: ['日', '月', '口', '目'], answer: 0 },
     { q: '"守株待___" 成语填空', options: ['兔', '虎', '羊', '鹿'], answer: 0 },
-    { q: '下列哪个是动物？', options: ['苹果', '老虎', '书包', '太阳'], answer: 1 },
-    { q: '"水"字共有几画？', options: ['3画', '4画', '5画', '6画'], answer: 1 },
     { q: '"亡羊补___" 成语填空', options: ['牢', '圈', '栏', '门'], answer: 0 },
-    { q: '"花"字可以组成哪个词？', options: ['花饭', '花朵', '花跑', '花写'], answer: 1 },
-    { q: '"火"字加一笔变成？', options: ['大', '灭', '光', '热'], answer: 1 },
-    { q: '"自___自语" 成语填空', options: ['言', '语', '说', '话'], answer: 0 },
-    { q: '下列哪个是水果？', options: ['萝卜', '西瓜', '白菜', '土豆'], answer: 1 },
-    { q: '"马"字共有几画？', options: ['2画', '3画', '4画', '5画'], answer: 1 },
+    { q: '"掩耳盗___" 成语填空', options: ['钟', '铃', '鼓', '锣'], answer: 1 },
+    { q: '"高兴"的近义词是？', options: ['难过', '快乐', '生气', '害怕'], answer: 1 },
+    { q: '"黑暗"的反义词是？', options: ['光明', '夜晚', '寒冷', '安静'], answer: 0 },
+    { q: '"遥知不是雪，为有暗香来"描写的是什么花？', options: ['桃花', '梅花', '荷花', '菊花'], answer: 1 },
+    { q: '"床前明月光"的下一句是？', options: ['举头望明月', '疑是地上霜', '低头思故乡', '明月几时有'], answer: 1 },
+    { q: '下列哪个词语书写正确？', options: ['因该', '应该', '应该', '因该'], answer: 1 },
+    { q: '"叶公好___" 成语填空', options: ['龙', '虎', '马', '狗'], answer: 0 },
+    { q: '"忽然"的近义词是？', options: ['慢慢', '突然', '经常', '从来'], answer: 1 },
+    { q: '"粗心"的反义词是？', options: ['马虎', '仔细', '认真', '专心'], answer: 1 },
+    { q: '"春眠不觉晓"出自哪首诗？', options: ['《静夜思》', '《春晓》', '《咏鹅》', '《悯农》'], answer: 1 },
+    { q: '"刻舟求___" 成语填空', options: ['剑', '刀', '船', '鱼'], answer: 0 },
+    { q: '"唧唧复唧唧，木兰当户织"出自？', options: ['《静夜思》', '《木兰诗》', '《春晓》', '《咏柳》'], answer: 1 },
+    { q: '下列哪个是描写秋天的词语？', options: ['春暖花开', '秋高气爽', '烈日炎炎', '冰天雪地'], answer: 1 },
   ],
   english: [
-    { q: '"苹果"的英文是？', options: ['banana', 'apple', 'orange', 'grape'], answer: 1 },
-    { q: '"cat" 是什么意思？', options: ['狗', '猫', '鸟', '鱼'], answer: 1 },
-    { q: '"红色"的英文是？', options: ['blue', 'green', 'red', 'yellow'], answer: 2 },
-    { q: '"book" 是什么意思？', options: ['笔', '书', '桌子', '椅子'], answer: 1 },
-    { q: '"妈妈"的英文是？', options: ['father', 'mother', 'brother', 'sister'], answer: 1 },
-    { q: '"dog" 是什么意思？', options: ['猫', '狗', '兔子', '老鼠'], answer: 1 },
-    { q: '"水"的英文是？', options: ['milk', 'juice', 'water', 'tea'], answer: 2 },
-    { q: '"school" 是什么意思？', options: ['家', '学校', '医院', '商店'], answer: 1 },
-    { q: '"朋友"的英文是？', options: ['friend', 'family', 'father', 'food'], answer: 0 },
-    { q: '"one + two = ?"', options: ['three', 'four', 'five', 'six'], answer: 0 },
-    { q: '"眼睛"的英文是？', options: ['ear', 'eye', 'nose', 'mouth'], answer: 1 },
-    { q: '"happy" 是什么意思？', options: ['伤心的', '开心的', '生气的', '害怕的'], answer: 1 },
+    { q: '"大象"的英文是？', options: ['elephant', 'rabbit', 'monkey', 'tiger'], answer: 0 },
+    { q: '"library" 是什么意思？', options: ['图书馆', '医院', '超市', '电影院'], answer: 0 },
+    { q: '"漂亮的"英文是？', options: ['ugly', 'beautiful', 'tall', 'short'], answer: 1 },
+    { q: '"I have a pen." 是什么意思？', options: ['我有一支笔', '我有一本书', '我有一只猫', '我有一个包'], answer: 0 },
+    { q: '"早餐"的英文是？', options: ['lunch', 'dinner', 'breakfast', 'supper'], answer: 2 },
+    { q: '"Good morning!" 应该在什么时候说？', options: ['早上', '中午', '下午', '晚上'], answer: 0 },
+    { q: '"computer" 是什么意思？', options: ['电视', '电脑', '手机', '收音机'], answer: 1 },
+    { q: '"看电影"的英文是？', options: ['read a book', 'watch TV', 'see a film', 'play games'], answer: 2 },
+    { q: '"September" 是几月？', options: ['七月', '八月', '九月', '十月'], answer: 2 },
+    { q: '"Thank you very much." 的意思是？', options: ['非常抱歉', '非常感谢', '再见', '你好'], answer: 1 },
+    { q: '"天气"的英文是？', options: ['weather', 'whether', 'water', 'winter'], answer: 0 },
+    { q: 'She ___ my sister.', options: ['am', 'is', 'are', 'be'], answer: 1 },
+    { q: '"play football" 是什么意思？', options: ['打篮球', '踢足球', '打乒乓球', '游泳'], answer: 1 },
+    { q: '"医生"的英文是？', options: ['teacher', 'doctor', 'farmer', 'driver'], answer: 1 },
+    { q: '"How old are you?" 的意思是？', options: ['你好吗', '你多大了', '你叫什么', '你在哪里'], answer: 1 },
+    { q: '"weekend" 是什么意思？', options: ['工作日', '周末', '假期', '节日'], answer: 1 },
+    { q: 'I ___ reading a book.', options: ['am', 'is', 'are', 'be'], answer: 0 },
+    { q: '"Where are you from?" 的意思是？', options: ['你多大了', '你来自哪里', '你叫什么', '你好吗'], answer: 1 },
+    { q: '"最喜欢的"英文是？', options: ['favourite', 'beautiful', 'different', 'important'], answer: 0 },
+    { q: 'They ___ good friends.', options: ['am', 'is', 'are', 'be'], answer: 2 },
   ]
 };
 
@@ -409,6 +440,11 @@ const Audio = {
     setTimeout(() => this.playTone(784, 0.2, 'sine', 0.1), 200);
   },
   wrong() { this.playTone(200, 0.3, 'sawtooth', 0.1); },
+  bookSpawn() {
+    this.playTone(880, 0.08, 'sine', 0.08);
+    setTimeout(() => this.playTone(1100, 0.08, 'sine', 0.08), 60);
+    setTimeout(() => this.playTone(1320, 0.12, 'sine', 0.08), 120);
+  },
   teleport() {
     this.playTone(800, 0.1, 'sine', 0.1);
     setTimeout(() => this.playTone(1200, 0.15, 'sine', 0.08), 80);
@@ -563,15 +599,15 @@ function initMap() {
   addFurniture(11, 25, 24, 4, 3, 'dining_table');
 
   // ========== 传送点 ==========
-  // 衣柜传送 (卧室1 <-> 卧室4)
-  teleports.push({ x: 9 * TILE + TILE / 2, y: 3 * TILE + TILE / 2, pair: 1, type: 'wardrobe' });
-  teleports.push({ x: 9 * TILE + TILE / 2, y: 28 * TILE + TILE / 2, pair: 1, type: 'wardrobe' });
-  // 橱柜传送 (厨房 <-> 餐厅2)
-  teleports.push({ x: 30 * TILE + TILE / 2, y: 13 * TILE + TILE / 2, pair: 2, type: 'cabinet' });
-  teleports.push({ x: 30 * TILE + TILE / 2, y: 28 * TILE + TILE / 2, pair: 2, type: 'cabinet' });
-  // 书架暗门 (书房1 <-> 书房2)
-  teleports.push({ x: 2 * TILE + TILE / 2, y: 19 * TILE + TILE / 2, pair: 3, type: 'bookshelf' });
-  teleports.push({ x: 19 * TILE + TILE / 2, y: 20 * TILE + TILE / 2, pair: 3, type: 'bookshelf' });
+  // 衣柜传送 (卧室1 <-> 卧室4) - 均放在房间中央空旷处，避开家具和墙壁
+  teleports.push({ x: 5 * TILE + TILE / 2, y: 4 * TILE + TILE / 2, pair: 1, type: 'wardrobe' });
+  teleports.push({ x: 5 * TILE + TILE / 2, y: 26 * TILE + TILE / 2, pair: 1, type: 'wardrobe' });
+  // 橱柜传送 (厨房 <-> 餐厅2) - 放在房间空旷处，远离家具
+  teleports.push({ x: 26 * TILE + TILE / 2, y: 15 * TILE + TILE / 2, pair: 2, type: 'cabinet' });
+  teleports.push({ x: 26 * TILE + TILE / 2, y: 26 * TILE + TILE / 2, pair: 2, type: 'cabinet' });
+  // 书架暗门 (书房1 <-> 书房2) - 放在房间中央空旷处
+  teleports.push({ x: 5 * TILE + TILE / 2, y: 16 * TILE + TILE / 2, pair: 3, type: 'bookshelf' });
+  teleports.push({ x: 15 * TILE + TILE / 2, y: 16 * TILE + TILE / 2, pair: 3, type: 'bookshelf' });
 
   // ========== 妈妈巡逻点 ==========
   patrolPoints.push(
@@ -727,7 +763,7 @@ class Character {
 // ---------- 玩家（小女孩） ----------
 class Girl extends Character {
   constructor(x, y) {
-    super(x, y, 'hsl(330, 80%, 65%)', GIRL_SPEED, 11);
+    super(x, y, 'hsl(330, 80%, 65%)', GIRL_SPEED, 8);
     this.maxHp = MAX_HP_GIRL;
     this.hp = 3;
     this.shieldActive = false;
@@ -847,7 +883,7 @@ class Girl extends Character {
 // ---------- 玩家（爸爸） ----------
 class Dad extends Character {
   constructor(x, y) {
-    super(x, y, 'hsl(210, 70%, 55%)', DAD_SPEED, 13);
+    super(x, y, 'hsl(210, 70%, 55%)', DAD_SPEED, 10);
     this.maxHp = MAX_HP_NORMAL;
     this.hp = 3;
     this.skillCd = 0;
@@ -1014,7 +1050,7 @@ class Boomerang {
 // ---------- 妈妈（NPC） ----------
 class Mom extends Character {
   constructor(x, y) {
-    super(x, y, 'hsl(0, 70%, 55%)', MOM_SPEED, 14);
+    super(x, y, 'hsl(0, 70%, 55%)', MOM_SPEED, 11);
     this.maxHp = MOM_MAX_HP;
     this.hp = MOM_MAX_HP;
     this.targetPoint = 0;
@@ -1305,15 +1341,246 @@ class Mom extends Character {
   }
 }
 
+// ---------- 蜘蛛妈妈 ----------
+class SpiderMom extends Character {
+  constructor(x, y) {
+    super(x, y, 'hsl(280, 70%, 40%)', MOM_SPEED * 0.9, 12);
+    this.targetPoint = 0;
+    this.state = 'patrol';
+    this.pauseTimer = 0;
+    this.viewAngle = 0;
+    this.viewSweep = 0;
+    this.viewSweepDir = 1;
+    this.detectedFlash = 0;
+    this.path = [];
+    this.pathIndex = 0;
+    this.speedMultiplier = 1.0;
+    this.speedTimer = 0;
+    this.stuckTimer = 0;
+    this.lastPos = { x, y };
+    this.stuckCount = 0;
+    this.recentPoints = [];
+    this.webTimer = 0;
+    this.nextPoint();
+  }
+
+  nextPoint() {
+    const candidates = [];
+    for (let i = 0; i < patrolPoints.length; i++) {
+      if (!this.recentPoints.includes(i)) candidates.push(i);
+    }
+    const pool = candidates.length >= 2 ? candidates : patrolPoints.map((_, i) => i).filter(i => i !== this.targetPoint);
+    const next = pool[Math.floor(Math.random() * pool.length)];
+    this.targetPoint = next;
+    this.recentPoints.push(next);
+    if (this.recentPoints.length > 4) this.recentPoints.shift();
+    this.generatePath();
+    this.pathIndex = 0;
+    const speeds = [0.6, 0.8, 1.0, 1.2, 1.5];
+    this.speedMultiplier = speeds[Math.floor(Math.random() * speeds.length)];
+    this.speedTimer = 3000 + Math.random() * 5000;
+  }
+
+  generatePath() {
+    const target = patrolPoints[this.targetPoint];
+    const sx = this.x, sy = this.y;
+    const tx = target.x, ty = target.y;
+    this.path = [];
+    if (Math.random() < 0.5) {
+      this.path.push({ x: tx, y: sy });
+    } else {
+      this.path.push({ x: sx, y: ty });
+    }
+    this.path.push({ x: tx, y: ty });
+  }
+
+  update(dt, girl, dad) {
+    this.webTimer += dt;
+    if (this.webTimer >= WEB_SPAWN_INTERVAL) {
+      this.webTimer = 0;
+      this.spawnWeb();
+    }
+
+    if (this.state === 'patrol') {
+      const pathTarget = this.path[this.pathIndex];
+      if (!pathTarget) { this.nextPoint(); return { girlInView: false, dadInView: false }; }
+      const dx = pathTarget.x - this.x;
+      const dy = pathTarget.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      this.speedTimer -= dt;
+      if (this.speedTimer <= 0) {
+        const speeds = [0.5, 0.7, 0.9, 1.1, 1.4, 1.7];
+        this.speedMultiplier = speeds[Math.floor(Math.random() * speeds.length)];
+        this.speedTimer = 2000 + Math.random() * 4000;
+      }
+      const origSpeed = this.speed;
+      this.speed = origSpeed * this.speedMultiplier;
+      if (dist < 12) {
+        this.pathIndex++;
+        if (this.pathIndex >= this.path.length) {
+          this.state = 'pause';
+          this.pauseTimer = 1500 + Math.random() * 2500;
+          this.isMoving = false;
+        }
+      } else {
+        const oldX = this.x, oldY = this.y;
+        this.tryMove(dx, dy);
+        this.viewAngle = Math.atan2(dy, dx);
+        const moved = Math.hypot(this.x - oldX, this.y - oldY);
+        if (moved < 0.5) {
+          this.stuckTimer += dt;
+          if (this.stuckTimer > 800) {
+            this.stuckTimer = 0;
+            this.stuckCount++;
+            if (this.stuckCount > 2) { this.stuckCount = 0; this.nextPoint(); }
+            else {
+              const target = patrolPoints[this.targetPoint];
+              const offsets = [{ ox: 60, oy: 0 }, { ox: -60, oy: 0 }, { ox: 0, oy: 60 }, { ox: 0, oy: -60 }];
+              const off = offsets[Math.floor(Math.random() * offsets.length)];
+              this.path = [{ x: this.x + off.ox, y: this.y + off.oy }, { x: target.x, y: target.y }];
+              this.pathIndex = 0;
+            }
+          }
+        } else { this.stuckTimer = 0; this.stuckCount = 0; }
+      }
+      this.speed = origSpeed;
+    } else if (this.state === 'pause') {
+      this.pauseTimer -= dt;
+      this.isMoving = false;
+      this.viewSweep += 0.02 * this.viewSweepDir;
+      if (Math.abs(this.viewSweep) > 0.8) this.viewSweepDir *= -1;
+      if (this.pauseTimer <= 0) { this.state = 'patrol'; this.nextPoint(); }
+    }
+
+    const effectiveAngle = this.viewAngle + this.viewSweep;
+    const girlInView = this.inView(girl, effectiveAngle);
+    const dadInView = this.inView(dad, effectiveAngle);
+    if (girlInView || dadInView) this.detectedFlash = 10;
+    if (this.detectedFlash > 0) this.detectedFlash--;
+    return { girlInView, dadInView };
+  }
+
+  spawnWeb() {
+    // 在蜘蛛妈妈周围随机位置吐网（必须是地板）
+    for (let tries = 0; tries < 10; tries++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 40 + Math.random() * 80;
+      const wx = this.x + Math.cos(angle) * dist;
+      const wy = this.y + Math.sin(angle) * dist;
+      const gx = Math.floor(wx / TILE);
+      const gy = Math.floor(wy / TILE);
+      if (gx >= 0 && gx < MAP_W && gy >= 0 && gy < MAP_H && map[gy][gx] === 0) {
+        // 检查是否已有网
+        const exists = game.webs.some(w => w.gx === gx && w.gy === gy);
+        if (!exists) {
+          game.webs.push({
+            gx, gy,
+            x: gx * TILE + TILE / 2,
+            y: gy * TILE + TILE / 2,
+            spawnAt: Date.now(),
+            expireAt: Date.now() + WEB_DURATION,
+          });
+          return;
+        }
+      }
+    }
+  }
+
+  inView(target, angle) {
+    const dx = target.x - this.x;
+    const dy = target.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > VIEW_DIST) return false;
+    const targetAngle = Math.atan2(dy, dx);
+    let diff = targetAngle - angle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    if (Math.abs(diff) > VIEW_ANGLE / 2) return false;
+    return lineOfSight(this.x, this.y, target.x, target.y);
+  }
+
+  takeDamage() {
+    // 蜘蛛被击中也算对妈妈造成伤害
+    game.mom.takeDamage();
+  }
+
+  drawViewCone(ctx) {
+    const effectiveAngle = this.viewAngle + this.viewSweep;
+    const flash = this.detectedFlash > 0;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(effectiveAngle);
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, VIEW_DIST);
+    if (flash) {
+      gradient.addColorStop(0, 'hsla(280, 100%, 60%, 0.5)');
+      gradient.addColorStop(1, 'hsla(280, 100%, 50%, 0.1)');
+    } else {
+      gradient.addColorStop(0, 'hsla(280, 80%, 50%, 0.3)');
+      gradient.addColorStop(1, 'hsla(280, 80%, 50%, 0.05)');
+    }
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, VIEW_DIST, -VIEW_ANGLE / 2, VIEW_ANGLE / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  draw(ctx) {
+    const bob = this.isMoving ? Math.sin(this.animTimer * 0.3) * 1.5 : 0;
+    const legWave = this.isMoving ? Math.sin(this.animTimer * 0.5) * 3 : 0;
+
+    // 6只脚
+    ctx.strokeStyle = 'hsl(280, 60%, 25%)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const offset = (i - 1) * 6;
+      const wave = legWave * (i === 1 ? -1 : 1);
+      // 左脚
+      ctx.beginPath();
+      ctx.moveTo(this.x - 8, this.y + offset + bob);
+      ctx.lineTo(this.x - 18 - wave, this.y + offset + 8 + bob);
+      ctx.stroke();
+      // 右脚
+      ctx.beginPath();
+      ctx.moveTo(this.x + 8, this.y + offset + bob);
+      ctx.lineTo(this.x + 18 + wave, this.y + offset + 8 + bob);
+      ctx.stroke();
+    }
+
+    // 身体（蜘蛛椭圆）
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.ellipse(this.x, this.y + 2 + bob, 14, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 头
+    ctx.fillStyle = 'hsl(280, 60%, 30%)';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 8 + bob, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 8只眼睛（红色发光）
+    ctx.fillStyle = 'hsl(0, 100%, 60%)';
+    const eyePositions = [[-4, -10], [-1, -11], [2, -11], [5, -10], [-3, -7], [0, -8], [3, -8], [6, -7]];
+    for (const [ex, ey] of eyePositions) {
+      ctx.beginPath();
+      ctx.arc(this.x + ex, this.y + ey + bob, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
 // ---------- 传送检测 ----------
 let teleportCooldown = {};
 function checkTeleport(char) {
   const charId = char instanceof Girl ? 'girl' : 'dad';
-  if (teleportCooldown[charId] && Date.now() - teleportCooldown[charId] < 3000) return;
+  if (teleportCooldown[charId] && Date.now() - teleportCooldown[charId] < 30000) return;
 
   for (const tp of teleports) {
     const dist = Math.hypot(char.x - tp.x, char.y - tp.y);
-    if (dist < 16) {
+    if (dist < 28) {
       // 找到配对的另一个传送点
       const pair = teleports.find(t => t.pair === tp.pair && t !== tp);
       if (pair) {
@@ -1369,16 +1636,28 @@ function shakeScreen() {
 
 // ---------- 游戏状态 ----------
 const game = {
-  state: 'menu', // menu, playing, paused, quiz, over
+  state: 'menu', // menu, playing, paused, quiz, reward, over
   girl: null,
   dad: null,
   mom: null,
+  momClones: [],     // 妈妈分身数组
+  spiderMoms: [],    // 蜘蛛妈妈数组
+  webs: [],          // 蜘蛛网数组
   projectiles: [],
   scale: 1,
   lastTime: 0,
   animId: null,
   currentQuiz: null,
   currentBookSpawn: null,
+  morphTimer: 0,     // 变形计时器
+  morphIndex: 0,     // 当前形态索引
+  morphFlash: 0,     // 变形闪光特效
+  morphName: '',     // 当前形态名称
+  gameTime: 0,       // 游戏总时长
+  // 玩家活动检测
+  girlActiveTimer: 0,
+  dadActiveTimer: 0,
+  playerCount: 2,
 };
 
 const input = {
@@ -1386,6 +1665,12 @@ const input = {
   w: false, a: false, s: false, d: false, q: false,
   // 爸爸
   ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, ' ': false,
+};
+
+// 玩家按键活动追踪
+const playerActivity = {
+  girl: 0,
+  dad: 0,
 };
 
 // ---------- 初始化游戏 ----------
@@ -1403,13 +1688,74 @@ function initGame() {
 
   // 妈妈出生在中间走廊
   game.mom = new Mom(22 * TILE, 9.5 * TILE);
-
+  game.momClones = [];
+  game.spiderMoms = [];
+  game.webs = [];
   game.projectiles = [];
   floatTexts.length = 0;
   teleportCooldown = {};
 
   // 重置书本
   bookSpawns.forEach(b => { b.hasBook = true; b.respawnAt = 0; });
+
+  // 重置变形系统
+  game.morphTimer = 0;
+  game.morphIndex = 0;
+  game.morphFlash = 0;
+  game.morphName = '普通形态';
+  game.gameTime = 0;
+  game.girlActiveTimer = 0;
+  game.dadActiveTimer = 0;
+  game.playerCount = 2;
+}
+
+// ---------- 妈妈形态切换 ----------
+function applyMorph(index) {
+  const morph = MORPH_SEQUENCE[index % MORPH_SEQUENCE.length];
+  game.momClones = [];
+  game.spiderMoms = [];
+
+  const spawnX = game.mom.x;
+  const spawnY = game.mom.y;
+
+  switch (morph) {
+    case 'normal':
+      game.morphName = '👩 普通形态';
+      break;
+    case 'spider':
+      game.morphName = '🕷️ 蜘蛛妈妈';
+      const s = new SpiderMom(spawnX, spawnY);
+      s.webTimer = 0;
+      game.spiderMoms.push(s);
+      break;
+    case 'clones2':
+      game.morphName = '👯 双分身形态';
+      for (let i = 0; i < 2; i++) {
+        const c = new Mom(spawnX + (i - 0.5) * 40, spawnY);
+        c.isClone = true;
+        game.momClones.push(c);
+      }
+      break;
+    case 'clones3':
+      game.morphName = '👯‍♀️ 三分身形态';
+      for (let i = 0; i < 3; i++) {
+        const c = new Mom(spawnX + (i - 1) * 40, spawnY);
+        c.isClone = true;
+        game.momClones.push(c);
+      }
+      break;
+    case 'spider2':
+      game.morphName = '🕷️🕷️ 双蜘蛛形态';
+      for (let i = 0; i < 2; i++) {
+        const s = new SpiderMom(spawnX + (i - 0.5) * 50, spawnY);
+        s.webTimer = i * 1500;
+        game.spiderMoms.push(s);
+      }
+      break;
+  }
+
+  game.morphFlash = 30;
+  showFloatText(game.mom.x, game.mom.y - 40, game.morphName, 'hsl(280, 80%, 55%)');
 }
 
 // ---------- 主循环 ----------
@@ -1429,40 +1775,124 @@ function gameLoop(timestamp) {
 }
 
 function update(dt) {
+  game.gameTime += dt;
+
+  // 玩家活动检测
+  const girlMoving = input.w || input.a || input.s || input.d || input.q;
+  const dadMoving = input.ArrowUp || input.ArrowDown || input.ArrowLeft || input.ArrowRight || input[' '];
+  if (girlMoving) game.girlActiveTimer = 2000;
+  else game.girlActiveTimer = Math.max(0, game.girlActiveTimer - dt);
+  if (dadMoving) game.dadActiveTimer = 2000;
+  else game.dadActiveTimer = Math.max(0, game.dadActiveTimer - dt);
+  let count = 0;
+  if (game.girlActiveTimer > 0) count++;
+  if (game.dadActiveTimer > 0) count++;
+  game.playerCount = Math.max(1, count);
+
+  // 变形计时
+  game.morphTimer += dt;
+  if (game.morphTimer >= MORPH_INTERVAL) {
+    game.morphTimer = 0;
+    game.morphIndex++;
+    applyMorph(game.morphIndex);
+  }
+  if (game.morphFlash > 0) game.morphFlash--;
+
   // 更新玩家
   game.girl.update(dt, input);
   game.dad.update(dt, input);
 
-  // 半月回旋
+  // 半月回旋（击中所有妈妈相关目标都算伤害）
   for (let i = game.projectiles.length - 1; i >= 0; i--) {
-    game.projectiles[i].update(dt, game.dad, game.mom);
+    const p = game.projectiles[i];
+    p.update(dt, game.dad, game.mom);
+    // 检查分身碰撞
+    for (const clone of game.momClones) {
+      const dist = Math.hypot(p.x - clone.x, p.y - clone.y);
+      if (dist < p.radius + clone.radius && !p.hit) {
+        p.hit = true;
+        game.mom.takeDamage();
+        p.active = false;
+        break;
+      }
+    }
+    // 检查蜘蛛碰撞
+    for (const sm of game.spiderMoms) {
+      const dist = Math.hypot(p.x - sm.x, p.y - sm.y);
+      if (dist < p.radius + sm.radius && !p.hit) {
+        p.hit = true;
+        game.mom.takeDamage();
+        p.active = false;
+        break;
+      }
+    }
     if (!game.projectiles[i].active) {
       game.projectiles.splice(i, 1);
     }
   }
 
-  // 妈妈AI + 视野检测
-  const { girlInView, dadInView } = game.mom.update(dt, game.girl, game.dad);
+  // 妈妈本体AI + 视野检测
+  const momResult = game.mom.update(dt, game.girl, game.dad);
+  let girlHit = momResult.girlInView;
+  let dadHit = momResult.dadInView;
 
-  if (girlInView) {
-    game.girl.takeDamage();
-  }
-  if (dadInView) {
-    game.dad.takeDamage();
+  // 分身AI + 视野检测
+  for (const clone of game.momClones) {
+    const r = clone.update(dt, game.girl, game.dad);
+    if (r.girlInView) girlHit = true;
+    if (r.dadInView) dadHit = true;
   }
 
-  // 书本检测（只有小女孩）
+  // 蜘蛛妈妈AI + 视野检测
+  for (const sm of game.spiderMoms) {
+    const r = sm.update(dt, game.girl, game.dad);
+    if (r.girlInView) girlHit = true;
+    if (r.dadInView) dadHit = true;
+  }
+
+  if (girlHit) game.girl.takeDamage();
+  if (dadHit) game.dad.takeDamage();
+
+  // 蜘蛛网伤害检测
+  const now = Date.now();
+  for (let i = game.webs.length - 1; i >= 0; i--) {
+    const web = game.webs[i];
+    if (now > web.expireAt) {
+      game.webs.splice(i, 1);
+      continue;
+    }
+    // 小女孩踩到
+    const gDist = Math.hypot(game.girl.x - web.x, game.girl.y - web.y);
+    if (gDist < TILE * 0.4) {
+      if (!game.girl.lastWebHit || now - game.girl.lastWebHit > 1500) {
+        game.girl.takeDamage();
+        game.girl.lastWebHit = now;
+        showFloatText(game.girl.x, game.girl.y - 20, '蜘蛛网!', 'hsl(280, 70%, 50%)');
+      }
+    }
+    // 爸爸踩到
+    const dDist = Math.hypot(game.dad.x - web.x, game.dad.y - web.y);
+    if (dDist < TILE * 0.4) {
+      if (!game.dad.lastWebHit || now - game.dad.lastWebHit > 1500) {
+        game.dad.takeDamage();
+        game.dad.lastWebHit = now;
+        showFloatText(game.dad.x, game.dad.y - 20, '蜘蛛网!', 'hsl(280, 70%, 50%)');
+      }
+    }
+  }
+
+  // 书本检测（只有小女孩，走到格子自动触发）
   for (const bs of bookSpawns) {
     if (bs.hasBook) {
       const dist = Math.hypot(game.girl.x - bs.x, game.girl.y - bs.y);
-      if (dist < 20) {
-        // 触发答题
+      if (dist < TILE * 1.5) {
         startQuiz(bs);
         return;
       }
     } else if (bs.respawnAt > 0 && Date.now() > bs.respawnAt) {
       bs.hasBook = true;
       bs.respawnAt = 0;
+      Audio.bookSpawn();
     }
   }
 
@@ -1475,8 +1905,6 @@ function update(dt) {
   } else if (game.girl.hp <= 0 || game.dad.hp <= 0) {
     endGame(false);
   }
-
-  // 地图固定显示，无相机跟随
 
   // 更新HUD
   updateHUD();
@@ -1507,17 +1935,31 @@ function render() {
   // 书本
   drawBooks(ctx);
 
+  // 蜘蛛网（在角色下层）
+  drawWebs(ctx);
+
   // 妈妈视野（在角色下层）
   game.mom.drawViewCone(ctx);
+  for (const clone of game.momClones) clone.drawViewCone(ctx);
+  for (const sm of game.spiderMoms) sm.drawViewCone(ctx);
 
   // 角色
   game.girl.draw(ctx);
   game.dad.draw(ctx);
   game.mom.draw(ctx);
+  for (const clone of game.momClones) clone.draw(ctx);
+  for (const sm of game.spiderMoms) sm.draw(ctx);
 
   // 投射物
   for (const p of game.projectiles) {
     p.draw(ctx);
+  }
+
+  // 变形闪光特效
+  if (game.morphFlash > 0) {
+    const alpha = game.morphFlash / 30;
+    ctx.fillStyle = `hsla(280, 100%, 70%, ${alpha * 0.4})`;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   }
 
   // 墙壁（顶层，制造遮挡感）
@@ -1724,13 +2166,23 @@ function drawFurniture(ctx) {
 
 function drawTeleports(ctx) {
   const t = Date.now() / 500;
+  const now = Date.now();
   for (const tp of teleports) {
     const x = tp.x;
     const y = tp.y;
 
-    // 发光效果
+    // 检查传送门是否处于冷却状态（任一玩家冷却中都灰化）
+    const girlCd = teleportCooldown['girl'] && now - teleportCooldown['girl'] < 30000;
+    const dadCd = teleportCooldown['dad'] && now - teleportCooldown['dad'] < 30000;
+    const isCooling = girlCd || dadCd;
+
+    // 发光效果（冷却中变灰变暗）
     const pulse = 0.5 + Math.sin(t) * 0.3;
-    ctx.fillStyle = `hsla(280, 70%, 60%, ${pulse * 0.3})`;
+    if (isCooling) {
+      ctx.fillStyle = `hsla(0, 0%, 50%, ${pulse * 0.15})`;
+    } else {
+      ctx.fillStyle = `hsla(280, 70%, 60%, ${pulse * 0.3})`;
+    }
     ctx.beginPath();
     ctx.arc(x, y, 18, 0, Math.PI * 2);
     ctx.fill();
@@ -1758,48 +2210,146 @@ function drawTeleports(ctx) {
       ctx.fillRect(x + 1, y + 1, 9, 7);
     } else if (tp.type === 'bookshelf') {
       // 书架暗门
-      ctx.fillStyle = 'hsl(25, 45%, 35%)';
+      ctx.fillStyle = isCooling ? 'hsl(25, 10%, 40%)' : 'hsl(25, 45%, 35%)';
       ctx.fillRect(x - 10, y - 14, 20, 28);
-      // 发光的书
-      ctx.fillStyle = `hsl(120, 70%, ${50 + Math.sin(t * 2) * 20}%)`;
+      // 发光的书（冷却中变暗）
+      if (isCooling) {
+        ctx.fillStyle = 'hsl(120, 10%, 45%)';
+      } else {
+        ctx.fillStyle = `hsl(120, 70%, ${50 + Math.sin(t * 2) * 20}%)`;
+      }
       ctx.fillRect(x - 4, y - 4, 8, 10);
+    }
+
+    // 冷却中叠加灰色半透明遮罩
+    if (isCooling) {
+      ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
+      ctx.beginPath();
+      ctx.arc(x, y, 16, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 }
 
 function drawBooks(ctx) {
-  const t = Date.now() / 300;
+  const t = Date.now() / 200;
   for (const bs of bookSpawns) {
     if (!bs.hasBook) continue;
     const x = bs.x;
-    const y = bs.y;
+    const y = bs.y + Math.sin(t * 0.8) * 4; // 上下浮动
 
-    // 发光
-    const glow = 0.5 + Math.sin(t) * 0.3;
-    ctx.fillStyle = `hsla(120, 70%, 50%, ${glow * 0.4})`;
+    // 金黄色强烈光晕（多层脉冲）
+    for (let i = 5; i >= 1; i--) {
+      const pulse = 0.5 + Math.sin(t * 0.6 + i * 0.7) * 0.4;
+      ctx.fillStyle = `hsla(45, 100%, 55%, ${pulse * 0.18 / i})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 18 + i * 10, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 最外层绿色柔光（知识的气息）
+    ctx.fillStyle = `hsla(120, 70%, 50%, ${0.15 + Math.sin(t * 0.4) * 0.08})`;
     ctx.beginPath();
-    ctx.arc(x, y, 16, 0, Math.PI * 2);
+    ctx.arc(x, y, 70, 0, Math.PI * 2);
     ctx.fill();
 
-    // 书本
-    ctx.fillStyle = 'hsl(45, 80%, 60%)';
-    ctx.fillRect(x - 8, y - 10, 16, 20);
-    ctx.fillStyle = 'hsl(30, 70%, 50%)';
-    ctx.fillRect(x - 8, y - 10, 4, 20);
+    // 书本（放大2倍）
+    const bw = 32, bh = 40;
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(x - bw / 2 + 3, y - bh / 2 + 5, bw, bh);
+    // 书脊
+    ctx.fillStyle = 'hsl(30, 80%, 45%)';
+    ctx.fillRect(x - bw / 2, y - bh / 2, 7, bh);
+    // 封面
+    ctx.fillStyle = 'hsl(45, 90%, 55%)';
+    ctx.fillRect(x - bw / 2 + 7, y - bh / 2, bw - 7, bh);
+    // 封面装饰线
+    ctx.strokeStyle = 'hsl(35, 70%, 40%)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - bw / 2 + 7 + 3, y - bh / 2 + 4, bw - 13, bh - 8);
     // 书页
-    ctx.fillStyle = 'hsl(50, 90%, 90%)';
-    ctx.fillRect(x - 3, y - 8, 10, 16);
-    // 线条
-    ctx.strokeStyle = 'hsl(30, 50%, 40%)';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = 'hsl(50, 90%, 92%)';
+    ctx.fillRect(x - bw / 2 + 10, y - bh / 2 + 7, bw - 17, bh - 14);
+    // 文字线条
+    ctx.strokeStyle = 'hsl(30, 50%, 45%)';
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x - bw / 2 + 13, y - bh / 2 + 12 + i * 5);
+      ctx.lineTo(x + bw / 2 - 8, y - bh / 2 + 12 + i * 5);
+      ctx.stroke();
+    }
+    // 书签
+    ctx.fillStyle = 'hsl(0, 75%, 55%)';
     ctx.beginPath();
-    ctx.moveTo(x - 1, y - 5);
-    ctx.lineTo(x + 6, y - 5);
-    ctx.moveTo(x - 1, y - 1);
-    ctx.lineTo(x + 6, y - 1);
-    ctx.moveTo(x - 1, y + 3);
-    ctx.lineTo(x + 6, y + 3);
-    ctx.stroke();
+    ctx.moveTo(x + bw / 2 - 10, y - bh / 2);
+    ctx.lineTo(x + bw / 2 - 5, y - bh / 2);
+    ctx.lineTo(x + bw / 2 - 7.5, y - bh / 2 + 10);
+    ctx.closePath();
+    ctx.fill();
+
+    // 多颗闪烁星星
+    const starPositions = [
+      { sx: -14, sy: -18, sz: 3.5 },
+      { sx: 16, sy: -16, sz: 3 },
+      { sx: -18, sy: 14, sz: 2.5 },
+      { sx: 18, sy: 16, sz: 3 },
+      { sx: 0, sy: -24, sz: 4 },
+    ];
+    starPositions.forEach((s, si) => {
+      const sp = Math.max(0, Math.sin(t * 1.2 + si * 1.3));
+      if (sp < 0.3) return;
+      ctx.fillStyle = `hsla(60, 100%, 70%, ${sp})`;
+      drawStar(ctx, x + s.sx, y + s.sy, s.sz, 4);
+    });
+  }
+}
+
+function drawStar(ctx, cx, cy, r, points) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const radius = i % 2 === 0 ? r : r * 0.4;
+    const angle = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+    const px = cx + Math.cos(angle) * radius;
+    const py = cy + Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawWebs(ctx) {
+  const t = Date.now() / 1000;
+  for (const web of game.webs) {
+    const x = web.x;
+    const y = web.y;
+    const age = (Date.now() - web.spawnAt) / WEB_DURATION;
+    const alpha = age < 0.1 ? age * 10 : (age > 0.85 ? (1 - age) * 6.67 : 1);
+
+    // 网的底色
+    ctx.fillStyle = `hsla(0, 0%, 95%, ${alpha * 0.5})`;
+    ctx.beginPath();
+    ctx.arc(x, y, TILE * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 蛛网线
+    ctx.strokeStyle = `hsla(0, 0%, 40%, ${alpha * 0.8})`;
+    ctx.lineWidth = 1;
+    // 放射线
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(angle) * TILE * 0.42, y + Math.sin(angle) * TILE * 0.42);
+      ctx.stroke();
+    }
+    // 同心环
+    for (let r = 1; r <= 3; r++) {
+      ctx.beginPath();
+      ctx.arc(x, y, TILE * 0.12 * r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 }
 
@@ -1833,10 +2383,42 @@ function drawMinimap() {
   }
 
   // 妈妈视野（小地图上的红点）
-  ctx.fillStyle = 'hsla(0, 80%, 50%, 0.3)';
+  ctx.fillStyle = 'hsla(0, 80%, 50%, 0.25)';
   ctx.beginPath();
   ctx.arc(game.mom.x * scaleX, game.mom.y * scaleY, VIEW_DIST * scaleX * 0.7, 0, Math.PI * 2);
   ctx.fill();
+  for (const clone of game.momClones) {
+    ctx.beginPath();
+    ctx.arc(clone.x * scaleX, clone.y * scaleY, VIEW_DIST * scaleX * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (const sm of game.spiderMoms) {
+    ctx.fillStyle = 'hsla(280, 80%, 50%, 0.25)';
+    ctx.beginPath();
+    ctx.arc(sm.x * scaleX, sm.y * scaleY, VIEW_DIST * scaleX * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'hsla(0, 80%, 50%, 0.25)';
+  }
+
+  // 蜘蛛网
+  ctx.fillStyle = 'hsla(0, 0%, 60%, 0.6)';
+  for (const web of game.webs) {
+    ctx.fillRect(web.gx * TILE * scaleX, web.gy * TILE * scaleY, TILE * scaleX + 1, TILE * scaleY + 1);
+  }
+
+  // 书本（金色闪烁标记）
+  const bookT = Date.now() / 300;
+  for (const bs of bookSpawns) {
+    if (!bs.hasBook) continue;
+    const pulse = 0.7 + Math.sin(bookT) * 0.3;
+    ctx.fillStyle = `hsla(45, 100%, 50%, ${pulse})`;
+    const bx = bs.x * scaleX;
+    const by = bs.y * scaleY;
+    // 小书本图标
+    ctx.fillRect(bx - 3, by - 4, 6, 8);
+    ctx.fillStyle = 'hsla(60, 100%, 70%, 0.8)';
+    ctx.fillRect(bx - 2, by - 3, 4, 6);
+  }
 
   // 角色
   ctx.fillStyle = 'hsl(330, 80%, 65%)';
@@ -1849,10 +2431,25 @@ function drawMinimap() {
   ctx.arc(game.dad.x * scaleX, game.dad.y * scaleY, 3, 0, Math.PI * 2);
   ctx.fill();
 
+  // 妈妈本体
   ctx.fillStyle = 'hsl(0, 70%, 55%)';
   ctx.beginPath();
   ctx.arc(game.mom.x * scaleX, game.mom.y * scaleY, 4, 0, Math.PI * 2);
   ctx.fill();
+  // 分身
+  for (const clone of game.momClones) {
+    ctx.fillStyle = 'hsl(0, 60%, 65%)';
+    ctx.beginPath();
+    ctx.arc(clone.x * scaleX, clone.y * scaleY, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 蜘蛛妈妈
+  for (const sm of game.spiderMoms) {
+    ctx.fillStyle = 'hsl(280, 70%, 50%)';
+    ctx.beginPath();
+    ctx.arc(sm.x * scaleX, sm.y * scaleY, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 // ---------- HUD 更新 ----------
@@ -1887,6 +2484,17 @@ function updateHUD() {
     momHpEl.appendChild(heart);
   }
 
+  // 妈妈形态
+  const morphEl = document.getElementById('morphStatus');
+  if (morphEl) morphEl.textContent = game.morphName;
+
+  // 玩家人数
+  const pcEl = document.getElementById('playerCount');
+  if (pcEl) pcEl.textContent = `当前玩家：${game.playerCount}人`;
+
+  // 历史游玩人数
+  updatePlayCountDisplay();
+
   // 技能冷却
   const shieldEl = document.getElementById('girlShieldCd');
   if (game.girl.shieldActive) {
@@ -1908,6 +2516,13 @@ function updateHUD() {
     skillEl.textContent = '就绪';
     skillEl.className = 'text-orange-500 font-bold';
   }
+}
+
+function updatePlayCountDisplay() {
+  const el = document.getElementById('playCount');
+  if (el) el.textContent = `历史游玩：${getPlayCount()}人`;
+  const menuEl = document.getElementById('menuPlayCount');
+  if (menuEl) menuEl.textContent = `历史游玩人数：${getPlayCount()}人`;
 }
 
 // ---------- 答题系统 ----------
@@ -1960,21 +2575,67 @@ function answerQuiz(idx) {
 
   resultEl.classList.remove('hidden');
   if (idx === quiz.answer) {
-    resultEl.textContent = '🎉 答对了！恢复1点生命';
+    resultEl.textContent = '🎉 答对了！选择你的奖励';
     resultEl.style.color = 'hsl(120, 60%, 40%)';
-    game.girl.heal(1);
     Audio.correct();
+    // 显示奖励选择
+    showRewardChoice();
   } else {
     resultEl.textContent = '😅 答错了，下次加油！';
     resultEl.style.color = 'hsl(0, 60%, 50%)';
     Audio.wrong();
+    // 书本消失
+    game.currentBookSpawn.hasBook = false;
+    game.currentBookSpawn.respawnAt = Date.now() + BOOK_RESPAWN;
+    document.getElementById('quizCloseBtn').classList.remove('hidden');
   }
+}
+
+function showRewardChoice() {
+  game.state = 'reward';
+  const optionsEl = document.getElementById('quizOptions');
+  optionsEl.innerHTML = '';
+
+  const btn1 = document.createElement('div');
+  btn1.className = 'quiz-option bg-pink-50 border-2 border-pink-400 rounded-lg p-3 text-center font-bold text-pink-600 cursor-pointer hover:bg-pink-100 hover:scale-105 transition-all';
+  btn1.innerHTML = '💖 给自己 +1 HP';
+  btn1.onclick = () => chooseReward('self');
+  optionsEl.appendChild(btn1);
+
+  const btn2 = document.createElement('div');
+  btn2.className = 'quiz-option bg-blue-50 border-2 border-blue-400 rounded-lg p-3 text-center font-bold text-blue-600 cursor-pointer hover:bg-blue-100 hover:scale-105 transition-all';
+  btn2.innerHTML = '💙 给爸爸 +1 HP';
+  btn2.onclick = () => chooseReward('dad');
+  optionsEl.appendChild(btn2);
+
+  document.getElementById('quizCloseBtn').classList.add('hidden');
+}
+
+function chooseReward(choice) {
+  if (choice === 'self') {
+    game.girl.heal(1);
+    showFloatText(game.girl.x, game.girl.y - 30, '+1 HP', 'hsl(330, 80%, 55%)');
+  } else {
+    game.dad.heal(1);
+    showFloatText(game.dad.x, game.dad.y - 30, '+1 HP', 'hsl(210, 80%, 55%)');
+  }
+
+  // 更新HUD血量显示
+  updateHUD();
 
   // 书本消失
   game.currentBookSpawn.hasBook = false;
   game.currentBookSpawn.respawnAt = Date.now() + BOOK_RESPAWN;
 
-  document.getElementById('quizCloseBtn').classList.remove('hidden');
+  // 直接关闭答题界面，返回游戏
+  setTimeout(() => {
+    closeQuiz();
+  }, 600);
+
+  document.getElementById('quizResult').textContent = '✨ 奖励已发放！';
+  document.getElementById('quizResult').style.color = 'hsl(120, 60%, 40%)';
+  document.getElementById('quizCloseBtn').classList.add('hidden');
+  game.state = 'quiz';
 }
 
 function closeQuiz() {
@@ -1985,10 +2646,32 @@ function closeQuiz() {
   game.currentBookSpawn = null;
 }
 
+// ---------- 历史游玩人数 ----------
+function getPlayCount() {
+  try {
+    return parseInt(localStorage.getItem('mom_game_play_count') || '0', 10);
+  } catch(e) { return 0; }
+}
+function incPlayCount() {
+  try {
+    const key = 'mom_game_play_count';
+    const sessionKey = 'mom_game_session_counted';
+    if (sessionStorage.getItem(sessionKey)) return getPlayCount();
+    const n = getPlayCount() + 1;
+    localStorage.setItem(key, String(n));
+    sessionStorage.setItem(sessionKey, '1');
+    return n;
+  } catch(e) { return getPlayCount(); }
+}
+
 // ---------- 游戏流程控制 ----------
 function startGame() {
   Audio.init();
   Audio.startBGM();
+
+  // 历史游玩人数+1
+  incPlayCount();
+  updatePlayCountDisplay();
 
   initGame();
 
@@ -2109,6 +2792,7 @@ window.addEventListener('resize', resizeCanvas);
 
 // 初始化
 resizeCanvas();
+updatePlayCountDisplay();
 
 // 启动渲染循环（即使在菜单状态也运行，用于未来扩展）
 game.animId = requestAnimationFrame(gameLoop);
