@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>不能被妈妈发现 - 双人潜行游戏</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: 'hsl(45, 55%, 92%)',
+          wall: 'hsl(25, 30%, 35%)',
+          floor: 'hsl(40, 45%, 85%)',
+          'floor-2': 'hsl(42, 50%, 80%)',
+          primary: 'hsl(30, 85%, 55%)',
+          'primary-dark': 'hsl(25, 80%, 45%)',
+          girl: 'hsl(330, 80%, 65%)',
+          dad: 'hsl(210, 70%, 55%)',
+          mom: 'hsl(0, 70%, 55%)',
+          shield: 'hsl(200, 85%, 65%)',
+          book: 'hsl(120, 60%, 50%)',
+        },
+        fontFamily: {
+          pixel: ['"Press Start 2P"', 'monospace', 'sans-serif'],
+        }
+      }
+    }
+  };
+</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  img, video { max-width: 100%; height: auto; display: block; }
+  body { overflow-wrap: break-word; }
+
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+KuaiLe&display=swap');
+
+  body {
+    margin: 0;
+    font-family: 'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: hsl(45, 55%, 88%);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #gameCanvas {
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+
+  .pixel-font {
+    font-family: 'Press Start 2P', monospace, sans-serif;
+  }
+
+  .btn-pixel {
+    background: hsl(30, 85%, 55%);
+    color: white;
+    border: 4px solid hsl(25, 70%, 40%);
+    border-bottom-width: 6px;
+    padding: 12px 28px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.1s;
+    font-family: 'ZCOOL KuaiLe', sans-serif;
+    letter-spacing: 2px;
+  }
+  .btn-pixel:hover {
+    background: hsl(30, 85%, 60%);
+    transform: translateY(-2px);
+  }
+  .btn-pixel:active {
+    transform: translateY(2px);
+    border-bottom-width: 4px;
+  }
+
+  .heart {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin: 0 2px;
+  }
+
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-30px); }
+  }
+  .float-text {
+    animation: floatUp 1s ease-out forwards;
+    position: absolute;
+    pointer-events: none;
+    font-weight: bold;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+  .shake {
+    animation: shake 0.3s ease-in-out;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 10px hsl(120, 60%, 50%); }
+    50% { box-shadow: 0 0 25px hsl(120, 70%, 60%); }
+  }
+
+  .modal-overlay {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+  }
+
+  .quiz-option {
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+  .quiz-option:hover {
+    background: hsl(45, 70%, 80%);
+    transform: scale(1.02);
+  }
+
+  #minimap {
+    image-rendering: pixelated;
+  }
+</style>
+</head>
+<body class="bg-bg min-h-screen flex items-center justify-center">
+
+<div id="gameContainer" class="relative" style="width: 100vw; height: 100vh;">
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="absolute top-0 left-0 right-0 p-4 flex justify-between items-start pointer-events-none hidden">
+    <!-- 小女孩状态 -->
+    <div class="bg-white/90 rounded-lg p-3 border-4 border-pink-400 shadow-lg">
+      <div class="text-pink-500 font-bold text-sm mb-1">👧 小女孩</div>
+      <div id="girlHp" class="flex mb-1"></div>
+      <div class="text-xs text-gray-600">
+        水盾: <span id="girlShieldCd" class="text-blue-500 font-bold">就绪</span>
+      </div>
+    </div>
+
+    <!-- 妈妈血量 -->
+    <div class="bg-white/90 rounded-lg p-3 border-4 border-red-400 shadow-lg text-center">
+      <div class="text-red-500 font-bold text-sm mb-1">👩 妈妈</div>
+      <div id="momHp" class="flex justify-center"></div>
+    </div>
+
+    <!-- 爸爸状态 -->
+    <div class="bg-white/90 rounded-lg p-3 border-4 border-blue-400 shadow-lg text-right">
+      <div class="text-blue-500 font-bold text-sm mb-1">👨 爸爸</div>
+      <div id="dadHp" class="flex justify-end mb-1"></div>
+      <div class="text-xs text-gray-600">
+        半月: <span id="dadSkillCd" class="text-orange-500 font-bold">就绪</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 小地图 -->
+  <canvas id="minimap" class="absolute bottom-4 right-4 border-4 border-amber-700 rounded-lg shadow-xl hidden" width="160" height="120"></canvas>
+
+  <!-- 操作提示 -->
+  <div id="controlsHint" class="absolute bottom-4 left-4 bg-white/80 rounded-lg p-2 text-xs text-gray-700 hidden">
+    <div>👨 WASD移动 / 空格攻击</div>
+    <div>👧 ↑↓←→移动 / Q水盾</div>
+    <div>ESC 暂停</div>
+    <div class="text-amber-600 mt-1 border-t border-gray-300 pt-1">作者：悦如 v5</div>
+  </div>
+
+  <!-- 开始界面 -->
+  <div id="menuScreen" class="absolute inset-0 flex flex-col items-center justify-center modal-overlay z-20">
+    <div class="bg-gradient-to-b from-amber-100 to-orange-100 p-8 rounded-2xl border-8 border-amber-600 shadow-2xl text-center max-w-lg">
+      <h1 class="text-5xl font-bold text-amber-800 mb-1" style="text-shadow: 3px 3px 0 hsl(30, 80%, 70%);">
+        不能被妈妈发现 <span class="text-2xl align-super">v5</span>
+      </h1>
+      <p class="text-amber-700 mb-1 text-lg">双人潜行合作游戏</p>
+      <p class="text-amber-600 mb-6 text-sm">作者：悦如</p>
+
+      <div class="bg-white/60 rounded-lg p-4 mb-6 text-left text-sm text-gray-700">
+        <div class="font-bold text-amber-800 mb-2">🎮 游戏目标</div>
+        <p class="mb-3">爸爸和小女孩合作，躲避妈妈的视线，用半月回旋击败妈妈！</p>
+
+        <div class="font-bold text-amber-800 mb-2">🕹️ 操作方式</div>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="bg-blue-50 p-2 rounded">
+              <span class="text-blue-600 font-bold">👨 爸爸（玩家1）</span><br>
+              WASD 移动<br>
+              空格 半月回旋
+            </div>
+            <div class="bg-pink-50 p-2 rounded">
+              <span class="text-pink-600 font-bold">👧 小女孩（玩家2）</span><br>
+              ↑↓←→ 移动<br>
+              Q 水形海之盾
+            </div>
+          </div>
+
+        <div class="font-bold text-amber-800 mb-2">💡 小提示</div>
+        <ul class="list-disc list-inside text-xs space-y-1">
+          <li>躲在家具后面不会被妈妈看到</li>
+          <li>小女孩去书房答题可以回血</li>
+          <li>衣柜/橱柜里有隐藏传送点</li>
+          <li>被妈妈发现会扣血并送回出生点</li>
+        </ul>
+      </div>
+
+      <button id="startBtn" class="btn-pixel text-xl">开始游戏</button>
+    </div>
+  </div>
+
+  <!-- 暂停界面 -->
+  <div id="pauseScreen" class="absolute inset-0 flex flex-col items-center justify-center modal-overlay z-20 hidden">
+    <div class="bg-gradient-to-b from-amber-100 to-orange-100 p-8 rounded-2xl border-8 border-amber-600 shadow-2xl text-center">
+      <h2 class="text-4xl font-bold text-amber-800 mb-6">游戏暂停</h2>
+      <button id="resumeBtn" class="btn-pixel">继续游戏</button>
+    </div>
+  </div>
+
+  <!-- 答题界面 -->
+  <div id="quizScreen" class="absolute inset-0 flex flex-col items-center justify-center modal-overlay z-30 hidden">
+    <div class="bg-gradient-to-b from-green-50 to-emerald-100 p-6 rounded-2xl border-8 border-green-600 shadow-2xl max-w-md w-full mx-4">
+      <div class="text-center mb-4">
+        <span class="text-4xl">📚</span>
+        <h2 class="text-2xl font-bold text-green-700 mt-2">学习时间！</h2>
+        <p class="text-green-600 text-sm">答对题目可以恢复1点生命</p>
+      </div>
+
+      <div id="quizCategory" class="text-center text-sm text-gray-500 mb-2"></div>
+      <div id="quizQuestion" class="text-xl font-bold text-gray-800 text-center mb-4 min-h-[60px] flex items-center justify-center"></div>
+
+      <div id="quizOptions" class="space-y-2 mb-4"></div>
+
+      <div id="quizResult" class="text-center text-lg font-bold hidden mb-3"></div>
+
+      <button id="quizCloseBtn" class="btn-pixel w-full hidden">关闭</button>
+    </div>
+  </div>
+
+  <!-- 结算界面 -->
+  <div id="overScreen" class="absolute inset-0 flex flex-col items-center justify-center modal-overlay z-20 hidden">
+    <div class="bg-gradient-to-b from-amber-100 to-orange-100 p-8 rounded-2xl border-8 border-amber-600 shadow-2xl text-center">
+      <h2 id="overTitle" class="text-5xl font-bold mb-4"></h2>
+      <p id="overMsg" class="text-xl text-amber-700 mb-6"></p>
+      <button id="restartBtn" class="btn-pixel text-xl">再来一局</button>
+    </div>
+  </div>
+
+  <!-- 移动端虚拟按键 -->
+  <div id="mobileControls" class="absolute bottom-4 left-0 right-0 flex justify-between px-4 pointer-events-none md:hidden">
+    <div class="pointer-events-auto">
+      <div class="text-xs text-blue-600 font-bold text-center mb-1">👨 爸爸</div>
+      <div class="grid grid-cols-3 gap-1">
+        <div></div>
+        <button data-key="w" class="w-12 h-12 bg-blue-400/80 rounded-lg text-white font-bold text-xl active:bg-blue-600">↑</button>
+        <div></div>
+        <button data-key="a" class="w-12 h-12 bg-blue-400/80 rounded-lg text-white font-bold text-xl active:bg-blue-600">←</button>
+        <button data-key="s" class="w-12 h-12 bg-blue-400/80 rounded-lg text-white font-bold text-xl active:bg-blue-600">↓</button>
+        <button data-key="d" class="w-12 h-12 bg-blue-400/80 rounded-lg text-white font-bold text-xl active:bg-blue-600">→</button>
+      </div>
+      <button data-key=" " class="mt-1 w-full h-10 bg-orange-400/80 rounded-lg text-white font-bold text-sm active:bg-orange-600">半月回旋</button>
+    </div>
+    <div class="pointer-events-auto">
+      <div class="text-xs text-pink-600 font-bold text-center mb-1">👧 小女孩</div>
+      <div class="grid grid-cols-3 gap-1">
+        <div></div>
+        <button data-key="ArrowUp" class="w-12 h-12 bg-pink-400/80 rounded-lg text-white font-bold text-xl active:bg-pink-600">↑</button>
+        <div></div>
+        <button data-key="ArrowLeft" class="w-12 h-12 bg-pink-400/80 rounded-lg text-white font-bold text-xl active:bg-pink-600">←</button>
+        <button data-key="ArrowDown" class="w-12 h-12 bg-pink-400/80 rounded-lg text-white font-bold text-xl active:bg-pink-600">↓</button>
+        <button data-key="ArrowRight" class="w-12 h-12 bg-pink-400/80 rounded-lg text-white font-bold text-xl active:bg-pink-600">→</button>
+      </div>
+      <button data-key="q" class="mt-1 w-full h-10 bg-cyan-400/80 rounded-lg text-white font-bold text-sm active:bg-cyan-600">水形海盾</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 「不能被妈妈发现」双人潜行游戏
+// ============================================================
+
+// ---------- 常量配置 ----------
+const TILE = 24;
+const MAP_W = 45;
+const MAP_H = 32;
+const CANVAS_W = MAP_W * TILE;
+const CANVAS_H = MAP_H * TILE;
+
+const GIRL_SPEED = 6.0;
+const DAD_SPEED = 5.2;
+const MOM_SPEED = 2.8;
+
+const VIEW_ANGLE = Math.PI * 2 / 3; // 120度
+const VIEW_DIST = 180;
+
+const SHIELD_CD = 15000; // 15秒
+const BOOMERANG_CD = 2000; // 2秒
+const BOOMERANG_SPEED = 6;
+const BOOMERANG_RANGE = 300;
+
+const BOOK_RESPAWN = 30000; // 30秒
+const MAX_HP_GIRL = 5;
+const MAX_HP_NORMAL = 3;
+const MOM_MAX_HP = 3;
+
+// ---------- 题库 ----------
+const QUESTIONS = {
+  math: [
+    { q: '25 + 37 = ?', options: ['52', '62', '72', '58'], answer: 1 },
+    { q: '81 - 45 = ?', options: ['36', '46', '34', '44'], answer: 0 },
+    { q: '7 × 8 = ?', options: ['54', '56', '64', '48'], answer: 1 },
+    { q: '63 + 28 = ?', options: ['81', '91', '101', '85'], answer: 1 },
+    { q: '90 - 57 = ?', options: ['33', '43', '37', '23'], answer: 0 },
+    { q: '6 × 9 = ?', options: ['48', '52', '54', '56'], answer: 2 },
+    { q: '47 + 53 = ?', options: ['90', '100', '110', '97'], answer: 1 },
+    { q: '72 - 38 = ?', options: ['34', '44', '32', '46'], answer: 0 },
+    { q: '4 × 7 = ?', options: ['28', '32', '24', '36'], answer: 0 },
+    { q: '56 + 44 = ?', options: ['90', '100', '110', '80'], answer: 1 },
+    { q: '85 - 29 = ?', options: ['56', '66', '54', '64'], answer: 0 },
+    { q: '9 × 9 = ?', options: ['72', '81', '90', '63'], answer: 1 },
+    { q: '38 + 47 = ?', options: ['75', '85', '95', '82'], answer: 1 },
+    { q: '100 - 67 = ?', options: ['33', '43', '23', '37'], answer: 0 },
+    { q: '5 × 8 = ?', options: ['35', '45', '40', '50'], answer: 2 },
+  ],
+  chinese: [
+    { q: '"春"字可以组成哪个词？', options: ['春天', '春饭', '春跑', '春睡'], answer: 0 },
+    { q: '"画蛇添___" 成语填空', options: ['手', '脚', '足', '头'], answer: 2 },
+    { q: '"明"字的部首是？', options: ['日', '月', '口', '目'], answer: 0 },
+    { q: '"守株待___" 成语填空', options: ['兔', '虎', '羊', '鹿'], answer: 0 },
+    { q: '下列哪个是动物？', options: ['苹果', '老虎', '书包', '太阳'], answer: 1 },
+    { q: '"水"字共有几画？', options: ['3画', '4画', '5画', '6画'], answer: 1 },
+    { q: '"亡羊补___" 成语填空', options: ['牢', '圈', '栏', '门'], answer: 0 },
+    { q: '"花"字可以组成哪个词？', options: ['花饭', '花朵', '花跑', '花写'], answer: 1 },
+    { q: '"火"字加一笔变成？', options: ['大', '灭', '光', '热'], answer: 1 },
+    { q: '"自___自语" 成语填空', options: ['言', '语', '说', '话'], answer: 0 },
+    { q: '下列哪个是水果？', options: ['萝卜', '西瓜', '白菜', '土豆'], answer: 1 },
+    { q: '"马"字共有几画？', options: ['2画', '3画', '4画', '5画'], answer: 1 },
+  ],
+  english: [
+    { q: '"苹果"的英文是？', options: ['banana', 'apple', 'orange', 'grape'], answer: 1 },
+    { q: '"cat" 是什么意思？', options: ['狗', '猫', '鸟', '鱼'], answer: 1 },
+    { q: '"红色"的英文是？', options: ['blue', 'green', 'red', 'yellow'], answer: 2 },
+    { q: '"book" 是什么意思？', options: ['笔', '书', '桌子', '椅子'], answer: 1 },
+    { q: '"妈妈"的英文是？', options: ['father', 'mother', 'brother', 'sister'], answer: 1 },
+    { q: '"dog" 是什么意思？', options: ['猫', '狗', '兔子', '老鼠'], answer: 1 },
+    { q: '"水"的英文是？', options: ['milk', 'juice', 'water', 'tea'], answer: 2 },
+    { q: '"school" 是什么意思？', options: ['家', '学校', '医院', '商店'], answer: 1 },
+    { q: '"朋友"的英文是？', options: ['friend', 'family', 'father', 'food'], answer: 0 },
+    { q: '"one + two = ?"', options: ['three', 'four', 'five', 'six'], answer: 0 },
+    { q: '"眼睛"的英文是？', options: ['ear', 'eye', 'nose', 'mouth'], answer: 1 },
+    { q: '"happy" 是什么意思？', options: ['伤心的', '开心的', '生气的', '害怕的'], answer: 1 },
+  ]
+};
+
+// ---------- 音效系统 ----------
+const Audio = {
+  ctx: null,
+  bgmOsc: null,
+  bgmGain: null,
+  bgmInterval: null,
+  enabled: true,
+
+  init() {
+    if (this.ctx) return;
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) { this.enabled = false; }
+  },
+
+  playTone(freq, duration, type = 'sine', volume = 0.1) {
+    if (!this.enabled || !this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + duration);
+  },
+
+  step() { this.playTone(200 + Math.random() * 50, 0.05, 'square', 0.03); },
+  shield() {
+    this.playTone(400, 0.1, 'sine', 0.1);
+    setTimeout(() => this.playTone(600, 0.15, 'sine', 0.1), 80);
+  },
+  boomerang() { this.playTone(300, 0.15, 'sawtooth', 0.08); },
+  hit() {
+    this.playTone(150, 0.1, 'square', 0.15);
+    setTimeout(() => this.playTone(100, 0.15, 'square', 0.1), 50);
+  },
+  detected() {
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => this.playTone(800, 0.1, 'square', 0.12), i * 100);
+    }
+  },
+  correct() {
+    this.playTone(523, 0.1, 'sine', 0.1);
+    setTimeout(() => this.playTone(659, 0.1, 'sine', 0.1), 100);
+    setTimeout(() => this.playTone(784, 0.2, 'sine', 0.1), 200);
+  },
+  wrong() { this.playTone(200, 0.3, 'sawtooth', 0.1); },
+  teleport() {
+    this.playTone(800, 0.1, 'sine', 0.1);
+    setTimeout(() => this.playTone(1200, 0.15, 'sine', 0.08), 80);
+  },
+  win() {
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((n, i) => setTimeout(() => this.playTone(n, 0.3, 'sine', 0.12), i * 150));
+  },
+  lose() {
+    const notes = [400, 350, 300, 200];
+    notes.forEach((n, i) => setTimeout(() => this.playTone(n, 0.3, 'sawtooth', 0.1), i * 200));
+  },
+
+  startBGM() {
+    if (!this.enabled || !this.ctx || this.bgmInterval) return;
+    const melody = [523, 587, 659, 698, 784, 698, 659, 587, 523, 587, 659, 698, 784, 880, 784, 659];
+    let idx = 0;
+    this.bgmInterval = setInterval(() => {
+      this.playTone(melody[idx % melody.length], 0.2, 'triangle', 0.04);
+      idx++;
+    }, 350);
+  },
+  stopBGM() {
+    if (this.bgmInterval) {
+      clearInterval(this.bgmInterval);
+      this.bgmInterval = null;
+    }
+  }
+};
+
+// ---------- 地图系统 ----------
+// 0=地板, 1=墙, 2=门(可通行)
+const map = [];
+const furniture = []; // {x, y, w, h, type, room}
+const teleports = []; // {x, y, pair, type}
+const bookSpawns = []; // {x, y, roomId, hasBook, respawnAt}
+const patrolPoints = []; // 妈妈巡逻点
+
+// 房间定义 {id, name, type, x, y, w, h, doors:[...]}
+const rooms = [];
+
+function initMap() {
+  // 初始化全地板
+  for (let y = 0; y < MAP_H; y++) {
+    map[y] = [];
+    for (let x = 0; x < MAP_W; x++) {
+      map[y][x] = 0;
+    }
+  }
+
+  // 外墙
+  for (let x = 0; x < MAP_W; x++) {
+    map[0][x] = 1;
+    map[MAP_H - 1][x] = 1;
+  }
+  for (let y = 0; y < MAP_H; y++) {
+    map[y][0] = 1;
+    map[y][MAP_W - 1] = 1;
+  }
+
+  // ========== 房间布局（v5 加宽门+加宽走廊）==========
+  // 顶部区域 (y=1 ~ y=7，高7格)
+  // 卧室1 (左上)
+  addRoom(1, '卧室', 'bedroom', 1, 1, 10, 7, [{ x: 5, y: 7, side: 'bottom' }]);
+  // 洗手间1 (顶部中间左)
+  addRoom(2, '洗手间', 'bathroom', 11, 1, 6, 7, [{ x: 13, y: 7, side: 'bottom' }]);
+  // 卧室2 (顶部中间右)
+  addRoom(3, '卧室', 'bedroom', 17, 1, 10, 7, [{ x: 21, y: 7, side: 'bottom' }]);
+  // 洗手间2 (右上)
+  addRoom(4, '洗手间', 'bathroom', 27, 1, 6, 7, [{ x: 29, y: 7, side: 'bottom' }]);
+  // 卧室3 (顶部最右)
+  addRoom(5, '卧室', 'bedroom', 33, 1, 11, 7, [{ x: 37, y: 7, side: 'bottom' }]);
+
+  // 中间主走廊 (y=8 ~ y=11) - 4格宽横向主通道
+  // 走廊本身就是开放的，不需要加房间
+
+  // 左侧区域
+  // 书房1 (左上方)
+  addRoom(6, '书房', 'study', 1, 12, 10, 8, [{ x: 5, y: 12, side: 'top' }]);
+  // 卧室4 (左下方)
+  addRoom(7, '卧室', 'bedroom', 1, 22, 10, 9, [{ x: 5, y: 22, side: 'top' }]);
+
+  // 中间偏左 - 书房2
+  addRoom(8, '书房', 'study', 12, 12, 8, 9, [{ x: 12, y: 15, side: 'left' }]);
+
+  // 右侧区域（扩大右侧走廊）
+  // 厨房 (右上)
+  addRoom(9, '厨房', 'kitchen', 23, 12, 8, 8, [{ x: 23, y: 15, side: 'left' }]);
+  // 餐厅1 (右中)
+  addRoom(10, '餐厅', 'dining', 33, 12, 11, 8, [{ x: 33, y: 15, side: 'left' }]);
+  // 餐厅2 (右下上)
+  addRoom(11, '餐厅', 'dining', 23, 22, 8, 9, [{ x: 23, y: 26, side: 'left' }]);
+
+  // 底部区域
+  // 卧室5 (底部中间)
+  addRoom(12, '卧室', 'bedroom', 12, 23, 9, 8, [{ x: 15, y: 22, side: 'top' }]);
+  // 洗手间3 (底部右)
+  addRoom(13, '洗手间', 'bathroom', 33, 22, 11, 9, [{ x: 33, y: 26, side: 'left' }]);
+
+  // 右侧走廊 (x=31~32列) - 2格宽纵向通道
+  // 已经通过门和中间走廊连通了
+
+  // ========== 家具（远离门口，确保通行顺畅）==========
+  // 卧室家具
+  addFurniture(1, 2, 2, 3, 2, 'bed');
+  addFurniture(1, 7, 3, 2, 1, 'desk');
+
+  addFurniture(3, 18, 2, 3, 2, 'bed');
+  addFurniture(3, 25, 3, 2, 1, 'desk');
+
+  addFurniture(5, 34, 2, 3, 2, 'bed');
+  addFurniture(5, 41, 3, 2, 1, 'desk');
+
+  addFurniture(7, 2, 23, 3, 2, 'bed');
+  addFurniture(7, 7, 24, 2, 1, 'desk');
+  addFurniture(7, 2, 28, 2, 1, 'sofa');
+
+  addFurniture(12, 13, 24, 3, 2, 'bed');
+  addFurniture(12, 19, 27, 2, 1, 'desk');
+
+  // 洗手间家具
+  addFurniture(2, 12, 2, 1, 1, 'toilet');
+  addFurniture(2, 15, 2, 1, 1, 'sink');
+  addFurniture(4, 28, 2, 1, 1, 'toilet');
+  addFurniture(4, 31, 2, 1, 1, 'sink');
+  addFurniture(13, 34, 23, 1, 1, 'toilet');
+  addFurniture(13, 40, 23, 1, 1, 'sink');
+  addFurniture(13, 35, 28, 3, 1, 'bathtub');
+
+  // 书房家具 + 书架(书本生成点)
+  addFurniture(6, 2, 13, 3, 1, 'bookshelf');
+  addFurniture(6, 8, 13, 2, 1, 'bookshelf');
+  addFurniture(6, 2, 18, 2, 1, 'desk');
+  bookSpawns.push({ x: 3 * TILE + TILE / 2, y: 13 * TILE + TILE / 2, roomId: 6, hasBook: true, respawnAt: 0 });
+  bookSpawns.push({ x: 9 * TILE + TILE / 2, y: 13 * TILE + TILE / 2, roomId: 6, hasBook: true, respawnAt: 0 });
+
+  addFurniture(8, 13, 13, 3, 1, 'bookshelf');
+  addFurniture(8, 18, 14, 2, 1, 'bookshelf');
+  addFurniture(8, 14, 19, 2, 1, 'desk');
+  bookSpawns.push({ x: 14 * TILE + TILE / 2, y: 13 * TILE + TILE / 2, roomId: 8, hasBook: true, respawnAt: 0 });
+  bookSpawns.push({ x: 19 * TILE + TILE / 2, y: 14 * TILE + TILE / 2, roomId: 8, hasBook: true, respawnAt: 0 });
+
+  // 厨房家具
+  addFurniture(9, 24, 13, 5, 1, 'counter');
+  addFurniture(9, 24, 15, 2, 1, 'stove');
+  addFurniture(9, 29, 15, 2, 2, 'fridge');
+  addFurniture(9, 25, 18, 3, 1, 'table');
+
+  // 餐厅家具
+  addFurniture(10, 36, 14, 5, 3, 'dining_table');
+
+  addFurniture(11, 25, 24, 4, 3, 'dining_table');
+
+  // ========== 传送点 ==========
+  // 衣柜传送 (卧室1 <-> 卧室4)
+  teleports.push({ x: 9 * TILE + TILE / 2, y: 3 * TILE + TILE / 2, pair: 1, type: 'wardrobe' });
+  teleports.push({ x: 9 * TILE + TILE / 2, y: 28 * TILE + TILE / 2, pair: 1, type: 'wardrobe' });
+  // 橱柜传送 (厨房 <-> 餐厅2)
+  teleports.push({ x: 30 * TILE + TILE / 2, y: 13 * TILE + TILE / 2, pair: 2, type: 'cabinet' });
+  teleports.push({ x: 30 * TILE + TILE / 2, y: 28 * TILE + TILE / 2, pair: 2, type: 'cabinet' });
+  // 书架暗门 (书房1 <-> 书房2)
+  teleports.push({ x: 2 * TILE + TILE / 2, y: 19 * TILE + TILE / 2, pair: 3, type: 'bookshelf' });
+  teleports.push({ x: 19 * TILE + TILE / 2, y: 20 * TILE + TILE / 2, pair: 3, type: 'bookshelf' });
+
+  // ========== 妈妈巡逻点 ==========
+  patrolPoints.push(
+    { x: 22 * TILE, y: 9.5 * TILE },  // 中间走廊
+    { x: 6 * TILE, y: 9.5 * TILE },   // 左走廊
+    { x: 37 * TILE, y: 9.5 * TILE },  // 右走廊
+    { x: 22 * TILE, y: 21 * TILE },   // 中下走廊
+    { x: 16 * TILE, y: 4 * TILE },    // 顶部区域
+    { x: 26 * TILE, y: 16 * TILE },   // 厨房附近
+    { x: 38 * TILE, y: 16 * TILE },   // 餐厅附近
+    { x: 16 * TILE, y: 26 * TILE },   // 底部卧室
+  );
+}
+
+function addRoom(id, name, type, x, y, w, h, doors) {
+  rooms.push({ id, name, type, x, y, w, h });
+  // 四周建墙
+  for (let dx = 0; dx < w; dx++) {
+    map[y][x + dx] = 1;
+    map[y + h - 1][x + dx] = 1;
+  }
+  for (let dy = 0; dy < h; dy++) {
+    map[y + dy][x] = 1;
+    map[y + dy][x + w - 1] = 1;
+  }
+  // 开门（3格宽，确保所有角色顺畅通过）
+  doors.forEach(d => {
+    if (d.side === 'bottom') {
+      map[y + h - 1][d.x] = 2;
+      map[y + h - 1][d.x + 1] = 2;
+      map[y + h - 1][d.x + 2] = 2;
+    } else if (d.side === 'top') {
+      map[y][d.x] = 2;
+      map[y][d.x + 1] = 2;
+      map[y][d.x + 2] = 2;
+    } else if (d.side === 'left') {
+      map[d.y][x] = 2;
+      map[d.y + 1][x] = 2;
+      map[d.y + 2][x] = 2;
+    } else if (d.side === 'right') {
+      map[d.y][x + w - 1] = 2;
+      map[d.y + 1][x + w - 1] = 2;
+      map[d.y + 2][x + w - 1] = 2;
+    }
+  });
+}
+
+function addFurniture(roomId, gx, gy, gw, gh, type) {
+  furniture.push({
+    x: gx * TILE,
+    y: gy * TILE,
+    w: gw * TILE,
+    h: gh * TILE,
+    type,
+    roomId
+  });
+}
+
+function isWall(px, py) {
+  const gx = Math.floor(px / TILE);
+  const gy = Math.floor(py / TILE);
+  if (gx < 0 || gx >= MAP_W || gy < 0 || gy >= MAP_H) return true;
+  return map[gy][gx] === 1;
+}
+
+function rectCollides(x, y, w, h) {
+  // 墙碰撞
+  const corners = [
+    [x, y], [x + w, y], [x, y + h], [x + w, y + h],
+    [x + w / 2, y], [x + w / 2, y + h],
+    [x, y + h / 2], [x + w, y + h / 2]
+  ];
+  for (const [cx, cy] of corners) {
+    if (isWall(cx, cy)) return true;
+  }
+  // 家具碰撞
+  for (const f of furniture) {
+    if (x < f.x + f.w && x + w > f.x && y < f.y + f.h && y + h > f.y) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// 视线检测：从(x1,y1)到(x2,y2)是否被家具/墙阻挡
+function lineOfSight(x1, y1, x2, y2) {
+  const steps = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 8);
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const px = x1 + (x2 - x1) * t;
+    const py = y1 + (y2 - y1) * t;
+    if (isWall(px, py)) return false;
+    for (const f of furniture) {
+      if (px >= f.x && px <= f.x + f.w && py >= f.y && py <= f.y + f.h) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// ---------- 角色类 ----------
+class Character {
+  constructor(x, y, color, speed, radius = 12) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.color = color;
+    this.speed = speed;
+    this.radius = radius;
+    this.facing = 0; // 朝向角度
+    this.hp = 3;
+    this.maxHp = 3;
+    this.animFrame = 0;
+    this.animTimer = 0;
+    this.isMoving = false;
+  }
+
+  tryMove(dx, dy) {
+    if (dx === 0 && dy === 0) {
+      this.isMoving = false;
+      return;
+    }
+    // 归一化
+    const len = Math.hypot(dx, dy);
+    dx = (dx / len) * this.speed;
+    dy = (dy / len) * this.speed;
+
+    this.facing = Math.atan2(dy, dx);
+    this.isMoving = true;
+
+    // X轴移动
+    const newX = this.x + dx;
+    if (!rectCollides(newX - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2)) {
+      this.x = newX;
+    }
+    // Y轴移动
+    const newY = this.y + dy;
+    if (!rectCollides(this.x - this.radius, newY - this.radius, this.radius * 2, this.radius * 2)) {
+      this.y = newY;
+    }
+
+    // 动画
+    this.animTimer++;
+    if (this.animTimer > 8) {
+      this.animTimer = 0;
+      this.animFrame = (this.animFrame + 1) % 4;
+    }
+  }
+}
+
+// ---------- 玩家（小女孩） ----------
+class Girl extends Character {
+  constructor(x, y) {
+    super(x, y, 'hsl(330, 80%, 65%)', GIRL_SPEED, 11);
+    this.maxHp = MAX_HP_GIRL;
+    this.hp = 3;
+    this.shieldActive = false;
+    this.shieldCd = 0;
+    this.shieldUsed = false; // 本盾是否已抵挡过
+    this.spawnX = x;
+    this.spawnY = y;
+    this.stepTimer = 0;
+  }
+
+  update(dt, input) {
+    let dx = 0, dy = 0;
+    if (input.ArrowUp) dy -= 1;
+    if (input.ArrowDown) dy += 1;
+    if (input.ArrowLeft) dx -= 1;
+    if (input.ArrowRight) dx += 1;
+    this.tryMove(dx, dy);
+
+    if (this.isMoving) {
+      this.stepTimer++;
+      if (this.stepTimer > 15) {
+        this.stepTimer = 0;
+        Audio.step();
+      }
+    }
+
+    // 冷却
+    if (this.shieldCd > 0) this.shieldCd -= dt;
+
+    // 传送检测
+    checkTeleport(this);
+  }
+
+  useShield() {
+    if (this.shieldCd <= 0 && !this.shieldActive) {
+      this.shieldActive = true;
+      this.shieldUsed = false;
+      this.shieldCd = SHIELD_CD;
+      Audio.shield();
+      return true;
+    }
+    return false;
+  }
+
+  takeDamage() {
+    if (this.shieldActive && !this.shieldUsed) {
+      this.shieldUsed = true;
+      this.shieldActive = false;
+      showFloatText(this.x, this.y - 20, '水盾抵挡!', 'hsl(200, 80%, 60%)');
+      return false;
+    }
+    this.hp--;
+    this.x = this.spawnX;
+    this.y = this.spawnY;
+    Audio.detected();
+    showFloatText(this.x, this.y - 20, '-1 HP', 'hsl(0, 80%, 55%)');
+    shakeScreen();
+    return true;
+  }
+
+  heal(amount = 1) {
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+    showFloatText(this.x, this.y - 20, `+${amount} HP`, 'hsl(120, 70%, 50%)');
+  }
+
+  draw(ctx) {
+    const bob = this.isMoving ? Math.sin(this.animTimer * 0.5) * 2 : 0;
+
+    // 身体
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y + bob, this.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 辫子
+    ctx.fillStyle = 'hsl(30, 50%, 30%)';
+    ctx.beginPath();
+    ctx.arc(this.x - 8, this.y - 8 + bob, 4, 0, Math.PI * 2);
+    ctx.arc(this.x + 8, this.y - 8 + bob, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 脸
+    ctx.fillStyle = 'hsl(30, 80%, 85%)';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 2 + bob, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 眼睛
+    ctx.fillStyle = '#333';
+    ctx.fillRect(this.x - 4, this.y - 3 + bob, 2, 2);
+    ctx.fillRect(this.x + 2, this.y - 3 + bob, 2, 2);
+
+    // 裙子
+    ctx.fillStyle = 'hsl(330, 70%, 55%)';
+    ctx.beginPath();
+    ctx.moveTo(this.x - 10, this.y + 5 + bob);
+    ctx.lineTo(this.x + 10, this.y + 5 + bob);
+    ctx.lineTo(this.x + 7, this.y + 12 + bob);
+    ctx.lineTo(this.x - 7, this.y + 12 + bob);
+    ctx.closePath();
+    ctx.fill();
+
+    // 水盾效果
+    if (this.shieldActive) {
+      const t = Date.now() / 200;
+      for (let i = 0; i < 3; i++) {
+        ctx.strokeStyle = `hsla(200, 85%, 65%, ${0.6 - i * 0.15})`;
+        ctx.lineWidth = 3 - i;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.radius + 6 + i * 4 + Math.sin(t + i) * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+// ---------- 玩家（爸爸） ----------
+class Dad extends Character {
+  constructor(x, y) {
+    super(x, y, 'hsl(210, 70%, 55%)', DAD_SPEED, 13);
+    this.maxHp = MAX_HP_NORMAL;
+    this.hp = 3;
+    this.skillCd = 0;
+    this.spawnX = x;
+    this.spawnY = y;
+    this.stepTimer = 0;
+  }
+
+  update(dt, input) {
+    let dx = 0, dy = 0;
+    if (input.w) dy -= 1;
+    if (input.s) dy += 1;
+    if (input.a) dx -= 1;
+    if (input.d) dx += 1;
+    this.tryMove(dx, dy);
+
+    if (this.isMoving) {
+      this.stepTimer++;
+      if (this.stepTimer > 18) {
+        this.stepTimer = 0;
+        Audio.step();
+      }
+    }
+
+    if (this.skillCd > 0) this.skillCd -= dt;
+
+    // 传送检测
+    checkTeleport(this);
+  }
+
+  useBoomerang(projectiles) {
+    if (this.skillCd <= 0) {
+      projectiles.push(new Boomerang(this.x, this.y, this.facing));
+      this.skillCd = BOOMERANG_CD;
+      Audio.boomerang();
+      return true;
+    }
+    return false;
+  }
+
+  takeDamage() {
+    this.hp--;
+    this.x = this.spawnX;
+    this.y = this.spawnY;
+    Audio.detected();
+    showFloatText(this.x, this.y - 20, '-1 HP', 'hsl(0, 80%, 55%)');
+    shakeScreen();
+    return true;
+  }
+
+  draw(ctx) {
+    const bob = this.isMoving ? Math.sin(this.animTimer * 0.5) * 2 : 0;
+
+    // 身体
+    ctx.fillStyle = this.color;
+    ctx.fillRect(this.x - 12, this.y - 5 + bob, 24, 18);
+
+    // 头
+    ctx.fillStyle = 'hsl(30, 80%, 85%)';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 10 + bob, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 头发
+    ctx.fillStyle = 'hsl(25, 40%, 25%)';
+    ctx.fillRect(this.x - 9, this.y - 18 + bob, 18, 5);
+
+    // 眼镜
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(this.x - 8, this.y - 11 + bob, 6, 5);
+    ctx.strokeRect(this.x + 2, this.y - 11 + bob, 6, 5);
+    ctx.beginPath();
+    ctx.moveTo(this.x - 2, this.y - 9 + bob);
+    ctx.lineTo(this.x + 2, this.y - 9 + bob);
+    ctx.stroke();
+
+    // 裤子
+    ctx.fillStyle = 'hsl(220, 40%, 35%)';
+    ctx.fillRect(this.x - 10, this.y + 10 + bob, 8, 6);
+    ctx.fillRect(this.x + 2, this.y + 10 + bob, 8, 6);
+
+    // 领带
+    ctx.fillStyle = 'hsl(0, 70%, 50%)';
+    ctx.fillRect(this.x - 2, this.y - 3 + bob, 4, 10);
+  }
+}
+
+// ---------- 半月回旋投射物 ----------
+class Boomerang {
+  constructor(x, y, angle) {
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.speed = BOOMERANG_SPEED;
+    this.range = BOOMERANG_RANGE;
+    this.traveled = 0;
+    this.returning = false;
+    this.rotation = 0;
+    this.active = true;
+    this.hitMom = false;
+  }
+
+  update(dt, dad, mom) {
+    this.rotation += 0.4;
+
+    if (!this.returning) {
+      this.x += Math.cos(this.angle) * this.speed;
+      this.y += Math.sin(this.angle) * this.speed;
+      this.traveled += this.speed;
+      if (this.traveled >= this.range) {
+        this.returning = true;
+      }
+    } else {
+      // 返回爸爸
+      const dx = dad.x - this.x;
+      const dy = dad.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 15) {
+        this.active = false;
+        return;
+      }
+      this.x += (dx / dist) * this.speed * 1.2;
+      this.y += (dy / dist) * this.speed * 1.2;
+    }
+
+    // 墙碰撞
+    if (isWall(this.x, this.y)) {
+      this.returning = true;
+    }
+
+    // 命中妈妈
+    if (!this.hitMom) {
+      const mdx = this.x - mom.x;
+      const mdy = this.y - mom.y;
+      if (Math.hypot(mdx, mdy) < mom.radius + 8) {
+        this.hitMom = true;
+        mom.takeDamage();
+        Audio.hit();
+      }
+    }
+  }
+
+  draw(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    // 月牙形
+    ctx.fillStyle = 'hsl(45, 90%, 70%)';
+    ctx.strokeStyle = 'hsl(30, 80%, 50%)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, -Math.PI * 0.7, Math.PI * 0.7);
+    ctx.arc(5, 0, 10, Math.PI * 0.7, -Math.PI * 0.7, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+// ---------- 妈妈（NPC） ----------
+class Mom extends Character {
+  constructor(x, y) {
+    super(x, y, 'hsl(0, 70%, 55%)', MOM_SPEED, 14);
+    this.maxHp = MOM_MAX_HP;
+    this.hp = MOM_MAX_HP;
+    this.targetPoint = 0;
+    this.state = 'patrol'; // patrol, pause
+    this.pauseTimer = 0;
+    this.viewAngle = 0;
+    this.viewSweep = 0;
+    this.viewSweepDir = 1;
+    this.detectedFlash = 0;
+
+    // 路径点（绕路用）
+    this.path = [];
+    this.pathIndex = 0;
+
+    // 速度变化
+    this.speedMultiplier = 1.0;
+    this.speedTimer = 0;
+
+    // 防卡住
+    this.stuckTimer = 0;
+    this.lastPos = { x, y };
+    this.stuckCount = 0;
+
+    // 防打转：记录最近访问的点
+    this.recentPoints = [];
+
+    this.nextPoint();
+  }
+
+  nextPoint() {
+    // 选择下一个巡逻点，避免最近访问过的点（防打转）
+    const candidates = [];
+    for (let i = 0; i < patrolPoints.length; i++) {
+      if (!this.recentPoints.includes(i)) {
+        candidates.push(i);
+      }
+    }
+    // 如果候选太少，就放宽限制
+    const pool = candidates.length >= 2 ? candidates : patrolPoints.map((_, i) => i).filter(i => i !== this.targetPoint);
+    const next = pool[Math.floor(Math.random() * pool.length)];
+    this.targetPoint = next;
+
+    // 记录最近访问
+    this.recentPoints.push(next);
+    if (this.recentPoints.length > 4) this.recentPoints.shift();
+
+    // 生成路径（用中间点绕路）
+    this.generatePath();
+    this.pathIndex = 0;
+
+    // 随机速度：有时快走，有时慢走
+    const speeds = [0.6, 0.8, 1.0, 1.2, 1.5, 1.8];
+    this.speedMultiplier = speeds[Math.floor(Math.random() * speeds.length)];
+    this.speedTimer = 3000 + Math.random() * 5000;
+  }
+
+  generatePath() {
+    const target = patrolPoints[this.targetPoint];
+    const sx = this.x, sy = this.y;
+    const tx = target.x, ty = target.y;
+
+    // 简单路径：先水平后垂直，或先垂直后水平（随机选一种绕路方式）
+    this.path = [];
+    const midX = (sx + tx) / 2 + (Math.random() - 0.5) * 100;
+    const midY = (sy + ty) / 2 + (Math.random() - 0.5) * 100;
+
+    if (Math.random() < 0.5) {
+      // 先水平再垂直
+      this.path.push({ x: tx, y: sy });
+    } else {
+      // 先垂直再水平
+      this.path.push({ x: sx, y: ty });
+    }
+    this.path.push({ x: tx, y: ty });
+  }
+
+  update(dt, girl, dad) {
+    if (this.state === 'patrol') {
+      // 获取当前路径点
+      const pathTarget = this.path[this.pathIndex];
+      if (!pathTarget) {
+        this.nextPoint();
+        return { girlInView: false, dadInView: false };
+      }
+
+      const dx = pathTarget.x - this.x;
+      const dy = pathTarget.y - this.y;
+      const dist = Math.hypot(dx, dy);
+
+      // 速度变化
+      this.speedTimer -= dt;
+      if (this.speedTimer <= 0) {
+        const speeds = [0.5, 0.7, 0.9, 1.1, 1.4, 1.7, 2.0];
+        this.speedMultiplier = speeds[Math.floor(Math.random() * speeds.length)];
+        this.speedTimer = 2000 + Math.random() * 4000;
+      }
+
+      // 临时改变速度
+      const origSpeed = this.speed;
+      this.speed = origSpeed * this.speedMultiplier;
+
+      if (dist < 12) {
+        // 到达当前路径点
+        this.pathIndex++;
+        if (this.pathIndex >= this.path.length) {
+          // 到达最终目标，暂停
+          this.state = 'pause';
+          this.pauseTimer = 1500 + Math.random() * 2500;
+          this.isMoving = false;
+        }
+      } else {
+        const oldX = this.x, oldY = this.y;
+        this.tryMove(dx, dy);
+        this.viewAngle = Math.atan2(dy, dx);
+
+        // 检测是否卡住
+        const moved = Math.hypot(this.x - oldX, this.y - oldY);
+        if (moved < 0.5) {
+          this.stuckTimer += dt;
+          if (this.stuckTimer > 800) {
+            // 卡住了，尝试绕路
+            this.stuckTimer = 0;
+            this.stuckCount++;
+            if (this.stuckCount > 2) {
+              // 多次卡住，直接换目标点
+              this.stuckCount = 0;
+              this.nextPoint();
+            } else {
+              // 重新生成路径，加一个偏移中间点
+              this.regeneratePathAroundObstacle();
+            }
+          }
+        } else {
+          this.stuckTimer = 0;
+          this.stuckCount = 0;
+        }
+      }
+
+      this.speed = origSpeed;
+
+    } else if (this.state === 'pause') {
+      this.pauseTimer -= dt;
+      this.isMoving = false;
+      // 扫视
+      this.viewSweep += 0.02 * this.viewSweepDir;
+      if (Math.abs(this.viewSweep) > 0.8) {
+        this.viewSweepDir *= -1;
+      }
+      if (this.pauseTimer <= 0) {
+        this.state = 'patrol';
+        this.nextPoint();
+      }
+    }
+
+    // 视野检测
+    const effectiveAngle = this.viewAngle + this.viewSweep;
+    const girlInView = this.inView(girl, effectiveAngle);
+    const dadInView = this.inView(dad, effectiveAngle);
+
+    if (girlInView || dadInView) {
+      this.detectedFlash = 10;
+    }
+    if (this.detectedFlash > 0) this.detectedFlash--;
+
+    return { girlInView, dadInView };
+  }
+
+  regeneratePathAroundObstacle() {
+    const target = patrolPoints[this.targetPoint];
+    // 尝试不同方向的偏移
+    const offsets = [
+      { ox: 60, oy: 0 }, { ox: -60, oy: 0 },
+      { ox: 0, oy: 60 }, { ox: 0, oy: -60 },
+      { ox: 80, oy: 40 }, { ox: -80, oy: -40 },
+    ];
+    const off = offsets[Math.floor(Math.random() * offsets.length)];
+    this.path = [
+      { x: this.x + off.ox, y: this.y + off.oy },
+      { x: target.x, y: target.y }
+    ];
+    this.pathIndex = 0;
+  }
+
+  inView(target, angle) {
+    const dx = target.x - this.x;
+    const dy = target.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > VIEW_DIST) return false;
+
+    const targetAngle = Math.atan2(dy, dx);
+    let diff = targetAngle - angle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+
+    if (Math.abs(diff) > VIEW_ANGLE / 2) return false;
+
+    // 视线遮挡
+    return lineOfSight(this.x, this.y, target.x, target.y);
+  }
+
+  takeDamage() {
+    this.hp--;
+    showFloatText(this.x, this.y - 25, '-1 HP', 'hsl(0, 80%, 55%)');
+    shakeScreen();
+  }
+
+  drawViewCone(ctx) {
+    const effectiveAngle = this.viewAngle + this.viewSweep;
+    const flash = this.detectedFlash > 0;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(effectiveAngle);
+
+    // 扇形视野
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, VIEW_DIST);
+    if (flash) {
+      gradient.addColorStop(0, 'hsla(0, 100%, 60%, 0.5)');
+      gradient.addColorStop(1, 'hsla(0, 100%, 50%, 0.1)');
+    } else {
+      gradient.addColorStop(0, 'hsla(0, 80%, 50%, 0.3)');
+      gradient.addColorStop(1, 'hsla(0, 80%, 50%, 0.05)');
+    }
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, VIEW_DIST, -VIEW_ANGLE / 2, VIEW_ANGLE / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  draw(ctx) {
+    const bob = this.isMoving ? Math.sin(this.animTimer * 0.4) * 2 : 0;
+
+    // 身体（连衣裙）
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.moveTo(this.x - 14, this.y + 12 + bob);
+    ctx.lineTo(this.x + 14, this.y + 12 + bob);
+    ctx.lineTo(this.x + 10, this.y - 5 + bob);
+    ctx.lineTo(this.x - 10, this.y - 5 + bob);
+    ctx.closePath();
+    ctx.fill();
+
+    // 围裙
+    ctx.fillStyle = 'hsl(50, 80%, 85%)';
+    ctx.fillRect(this.x - 6, this.y - 3 + bob, 12, 14);
+    // 围裙带
+    ctx.fillStyle = 'hsl(45, 70%, 75%)';
+    ctx.fillRect(this.x - 10, this.y - 3 + bob, 4, 3);
+    ctx.fillRect(this.x + 6, this.y - 3 + bob, 4, 3);
+
+    // 头
+    ctx.fillStyle = 'hsl(30, 80%, 85%)';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 12 + bob, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 头发
+    ctx.fillStyle = 'hsl(20, 50%, 30%)';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 15 + bob, 10, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(this.x - 10, this.y - 15 + bob, 20, 4);
+
+    // 眼睛（生气的样子）
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(this.x - 6, this.y - 13 + bob);
+    ctx.lineTo(this.x - 2, this.y - 11 + bob);
+    ctx.moveTo(this.x + 6, this.y - 13 + bob);
+    ctx.lineTo(this.x + 2, this.y - 11 + bob);
+    ctx.stroke();
+    ctx.fillStyle = '#333';
+    ctx.fillRect(this.x - 5, this.y - 11 + bob, 2, 2);
+    ctx.fillRect(this.x + 3, this.y - 11 + bob, 2, 2);
+
+    // 嘴
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 7 + bob, 3, 0, Math.PI);
+    ctx.stroke();
+  }
+}
+
+// ---------- 传送检测 ----------
+let teleportCooldown = {};
+function checkTeleport(char) {
+  const charId = char instanceof Girl ? 'girl' : 'dad';
+  if (teleportCooldown[charId] && Date.now() - teleportCooldown[charId] < 3000) return;
+
+  for (const tp of teleports) {
+    const dist = Math.hypot(char.x - tp.x, char.y - tp.y);
+    if (dist < 16) {
+      // 找到配对的另一个传送点
+      const pair = teleports.find(t => t.pair === tp.pair && t !== tp);
+      if (pair) {
+        char.x = pair.x;
+        char.y = pair.y;
+        teleportCooldown[charId] = Date.now();
+        Audio.teleport();
+        showFloatText(char.x, char.y - 20, '传送!', 'hsl(280, 70%, 60%)');
+      }
+      break;
+    }
+  }
+}
+
+// ---------- 浮动文字 ----------
+const floatTexts = [];
+function showFloatText(x, y, text, color) {
+  floatTexts.push({ x, y, text, color, life: 60, vy: -1 });
+}
+
+function updateFloatTexts() {
+  for (let i = floatTexts.length - 1; i >= 0; i--) {
+    const ft = floatTexts[i];
+    ft.y += ft.vy;
+    ft.life--;
+    if (ft.life <= 0) floatTexts.splice(i, 1);
+  }
+}
+
+function drawFloatTexts(ctx) {
+  ctx.font = 'bold 14px "ZCOOL KuaiLe", sans-serif';
+  ctx.textAlign = 'center';
+  for (const ft of floatTexts) {
+    const alpha = Math.min(1, ft.life / 30);
+    ctx.fillStyle = ft.color;
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(ft.text, ft.x, ft.y);
+    ctx.fillText(ft.text, ft.x, ft.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------- 屏幕震动 ----------
+let shakeAmount = 0;
+function shakeScreen() {
+  shakeAmount = 8;
+  const container = document.getElementById('gameContainer');
+  container.classList.add('shake');
+  setTimeout(() => container.classList.remove('shake'), 300);
+}
+
+// ---------- 游戏状态 ----------
+const game = {
+  state: 'menu', // menu, playing, paused, quiz, over
+  girl: null,
+  dad: null,
+  mom: null,
+  projectiles: [],
+  scale: 1,
+  lastTime: 0,
+  animId: null,
+  currentQuiz: null,
+  currentBookSpawn: null,
+};
+
+const input = {
+  // 小女孩
+  w: false, a: false, s: false, d: false, q: false,
+  // 爸爸
+  ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, ' ': false,
+};
+
+// ---------- 初始化游戏 ----------
+function initGame() {
+  initMap();
+
+  // 出生点：卧室1中间空旷区域（避开家具）
+  game.girl = new Girl(4 * TILE + TILE / 2, 5 * TILE + TILE / 2);
+  game.girl.spawnX = 4 * TILE + TILE / 2;
+  game.girl.spawnY = 5 * TILE + TILE / 2;
+
+  game.dad = new Dad(6 * TILE + TILE / 2, 5 * TILE + TILE / 2);
+  game.dad.spawnX = 6 * TILE + TILE / 2;
+  game.dad.spawnY = 5 * TILE + TILE / 2;
+
+  // 妈妈出生在中间走廊
+  game.mom = new Mom(22 * TILE, 9.5 * TILE);
+
+  game.projectiles = [];
+  floatTexts.length = 0;
+  teleportCooldown = {};
+
+  // 重置书本
+  bookSpawns.forEach(b => { b.hasBook = true; b.respawnAt = 0; });
+}
+
+// ---------- 主循环 ----------
+function gameLoop(timestamp) {
+  if (game.state !== 'playing') {
+    game.animId = requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  const dt = Math.min(32, timestamp - game.lastTime);
+  game.lastTime = timestamp;
+
+  update(dt);
+  render();
+
+  game.animId = requestAnimationFrame(gameLoop);
+}
+
+function update(dt) {
+  // 更新玩家
+  game.girl.update(dt, input);
+  game.dad.update(dt, input);
+
+  // 半月回旋
+  for (let i = game.projectiles.length - 1; i >= 0; i--) {
+    game.projectiles[i].update(dt, game.dad, game.mom);
+    if (!game.projectiles[i].active) {
+      game.projectiles.splice(i, 1);
+    }
+  }
+
+  // 妈妈AI + 视野检测
+  const { girlInView, dadInView } = game.mom.update(dt, game.girl, game.dad);
+
+  if (girlInView) {
+    game.girl.takeDamage();
+  }
+  if (dadInView) {
+    game.dad.takeDamage();
+  }
+
+  // 书本检测（只有小女孩）
+  for (const bs of bookSpawns) {
+    if (bs.hasBook) {
+      const dist = Math.hypot(game.girl.x - bs.x, game.girl.y - bs.y);
+      if (dist < 20) {
+        // 触发答题
+        startQuiz(bs);
+        return;
+      }
+    } else if (bs.respawnAt > 0 && Date.now() > bs.respawnAt) {
+      bs.hasBook = true;
+      bs.respawnAt = 0;
+    }
+  }
+
+  // 浮动文字
+  updateFloatTexts();
+
+  // 胜负判定
+  if (game.mom.hp <= 0) {
+    endGame(true);
+  } else if (game.girl.hp <= 0 || game.dad.hp <= 0) {
+    endGame(false);
+  }
+
+  // 地图固定显示，无相机跟随
+
+  // 更新HUD
+  updateHUD();
+}
+
+// ---------- 渲染 ----------
+function render() {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 缩放居中显示整张地图
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.scale(game.scale, game.scale);
+  ctx.translate(-CANVAS_W / 2, -CANVAS_H / 2);
+
+  // 地板
+  drawFloor(ctx);
+
+  // 家具
+  drawFurniture(ctx);
+
+  // 传送点
+  drawTeleports(ctx);
+
+  // 书本
+  drawBooks(ctx);
+
+  // 妈妈视野（在角色下层）
+  game.mom.drawViewCone(ctx);
+
+  // 角色
+  game.girl.draw(ctx);
+  game.dad.draw(ctx);
+  game.mom.draw(ctx);
+
+  // 投射物
+  for (const p of game.projectiles) {
+    p.draw(ctx);
+  }
+
+  // 墙壁（顶层，制造遮挡感）
+  drawWalls(ctx);
+
+  // 浮动文字
+  drawFloatTexts(ctx);
+
+  ctx.restore();
+
+  // 小地图
+  drawMinimap();
+}
+
+function drawFloor(ctx) {
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (map[y][x] !== 1) {
+        const isAlt = (x + y) % 2 === 0;
+        ctx.fillStyle = isAlt ? 'hsl(40, 45%, 85%)' : 'hsl(42, 50%, 80%)';
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      }
+    }
+  }
+}
+
+function drawWalls(ctx) {
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (map[y][x] === 1) {
+        ctx.fillStyle = 'hsl(25, 35%, 40%)';
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        ctx.fillStyle = 'hsl(25, 40%, 50%)';
+        ctx.fillRect(x * TILE, y * TILE, TILE, 4);
+        ctx.strokeStyle = 'hsl(25, 30%, 30%)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x * TILE + 0.5, y * TILE + 0.5, TILE - 1, TILE - 1);
+      } else if (map[y][x] === 2) {
+        ctx.fillStyle = 'hsl(35, 40%, 78%)';
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        ctx.fillStyle = 'hsl(25, 35%, 40%)';
+        ctx.fillRect(x * TILE, y * TILE, 3, TILE);
+        ctx.fillRect(x * TILE + TILE - 3, y * TILE, 3, TILE);
+      }
+    }
+  }
+}
+
+function drawFurniture(ctx) {
+  for (const f of furniture) {
+    const x = f.x;
+    const y = f.y;
+
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(x + 3, y + 3, f.w, f.h);
+
+    switch (f.type) {
+      case 'bed':
+        // 床架
+        ctx.fillStyle = 'hsl(30, 40%, 60%)';
+        ctx.fillRect(x, y, f.w, f.h);
+        // 床垫
+        ctx.fillStyle = 'hsl(200, 60%, 85%)';
+        ctx.fillRect(x + 4, y + 4, f.w - 8, f.h - 8);
+        // 枕头
+        ctx.fillStyle = 'hsl(0, 0%, 95%)';
+        ctx.fillRect(x + 6, y + 6, f.w - 12, 12);
+        // 被子
+        ctx.fillStyle = 'hsl(340, 60%, 75%)';
+        ctx.fillRect(x + 4, y + 20, f.w - 8, f.h - 24);
+        break;
+
+      case 'desk':
+        ctx.fillStyle = 'hsl(30, 50%, 55%)';
+        ctx.fillRect(x, y, f.w, f.h);
+        // 桌面
+        ctx.fillStyle = 'hsl(30, 55%, 65%)';
+        ctx.fillRect(x, y, f.w, 6);
+        // 桌腿
+        ctx.fillStyle = 'hsl(25, 40%, 40%)';
+        ctx.fillRect(x + 2, y + 6, 4, f.h - 6);
+        ctx.fillRect(x + f.w - 6, y + 6, 4, f.h - 6);
+        break;
+
+      case 'chair':
+        ctx.fillStyle = 'hsl(25, 45%, 50%)';
+        ctx.fillRect(x + 2, y + 4, f.w - 4, f.h - 4);
+        ctx.fillStyle = 'hsl(25, 50%, 60%)';
+        ctx.fillRect(x, y, f.w, 6);
+        break;
+
+      case 'sofa':
+        ctx.fillStyle = 'hsl(210, 50%, 60%)';
+        ctx.fillRect(x, y + 4, f.w, f.h - 4);
+        ctx.fillStyle = 'hsl(210, 60%, 70%)';
+        ctx.fillRect(x, y, f.w, 10);
+        // 靠垫
+        ctx.fillStyle = 'hsl(210, 40%, 75%)';
+        ctx.fillRect(x + 4, y + 2, 10, 8);
+        ctx.fillRect(x + f.w - 14, y + 2, 10, 8);
+        break;
+
+      case 'bookshelf':
+        ctx.fillStyle = 'hsl(25, 45%, 40%)';
+        ctx.fillRect(x, y, f.w, f.h);
+        // 书架层
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = 'hsl(25, 40%, 50%)';
+          ctx.fillRect(x + 2, y + 4 + i * 10, f.w - 4, 2);
+          // 书
+          const bookColors = ['hsl(0,60%,60%)', 'hsl(210,60%,60%)', 'hsl(120,60%,50%)', 'hsl(45,70%,60%)'];
+          for (let j = 0; j < Math.floor(f.w / 8); j++) {
+            ctx.fillStyle = bookColors[(i + j) % bookColors.length];
+            ctx.fillRect(x + 4 + j * 8, y + 6 + i * 10, 6, 8);
+          }
+        }
+        break;
+
+      case 'toilet':
+        ctx.fillStyle = 'hsl(200, 20%, 85%)';
+        // 水箱
+        ctx.fillRect(x + 2, y + 2, f.w - 4, 12);
+        // 马桶座
+        ctx.beginPath();
+        ctx.ellipse(x + f.w / 2, y + f.h - 8, f.w / 2 - 2, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case 'sink':
+        ctx.fillStyle = 'hsl(200, 15%, 80%)';
+        ctx.fillRect(x, y + 4, f.w, f.h - 4);
+        ctx.fillStyle = 'hsl(200, 25%, 70%)';
+        ctx.beginPath();
+        ctx.ellipse(x + f.w / 2, y + 10, f.w / 2 - 4, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 水龙头
+        ctx.fillStyle = 'hsl(45, 60%, 60%)';
+        ctx.fillRect(x + f.w / 2 - 2, y, 4, 8);
+        break;
+
+      case 'bathtub':
+        ctx.fillStyle = 'hsl(200, 20%, 85%)';
+        ctx.fillRect(x, y + 4, f.w, f.h - 4);
+        ctx.fillStyle = 'hsl(200, 30%, 75%)';
+        ctx.fillRect(x + 4, y + 8, f.w - 8, f.h - 12);
+        break;
+
+      case 'counter':
+      case 'stove':
+        ctx.fillStyle = 'hsl(30, 30%, 70%)';
+        ctx.fillRect(x, y, f.w, f.h);
+        ctx.fillStyle = 'hsl(30, 25%, 80%)';
+        ctx.fillRect(x, y, f.w, 6);
+        if (f.type === 'stove') {
+          // 灶眼
+          ctx.fillStyle = 'hsl(0, 0%, 30%)';
+          ctx.beginPath();
+          ctx.arc(x + f.w / 4, y + f.h / 2, 6, 0, Math.PI * 2);
+          ctx.arc(x + f.w * 3 / 4, y + f.h / 2, 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+
+      case 'fridge':
+        ctx.fillStyle = 'hsl(200, 15%, 85%)';
+        ctx.fillRect(x, y, f.w, f.h);
+        ctx.strokeStyle = 'hsl(200, 10%, 70%)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 2, y + 2, f.w - 4, f.h / 2 - 3);
+        ctx.strokeRect(x + 2, y + f.h / 2 + 1, f.w - 4, f.h / 2 - 3);
+        // 把手
+        ctx.fillStyle = 'hsl(200, 10%, 60%)';
+        ctx.fillRect(x + f.w - 8, y + 8, 3, 10);
+        ctx.fillRect(x + f.w - 8, y + f.h / 2 + 6, 3, 10);
+        break;
+
+      case 'table':
+      case 'dining_table':
+        ctx.fillStyle = 'hsl(30, 50%, 55%)';
+        ctx.fillRect(x, y, f.w, f.h);
+        ctx.fillStyle = 'hsl(30, 55%, 65%)';
+        ctx.fillRect(x, y, f.w, 8);
+        // 桌腿
+        ctx.fillStyle = 'hsl(25, 40%, 40%)';
+        ctx.fillRect(x + 4, y + 8, 6, f.h - 8);
+        ctx.fillRect(x + f.w - 10, y + 8, 6, f.h - 8);
+        if (f.type === 'dining_table') {
+          // 盘子
+          ctx.fillStyle = 'hsl(0, 0%, 95%)';
+          ctx.beginPath();
+          ctx.arc(x + f.w / 3, y + f.h / 2, 8, 0, Math.PI * 2);
+          ctx.arc(x + f.w * 2 / 3, y + f.h / 2, 8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+
+      default:
+        ctx.fillStyle = 'hsl(30, 40%, 60%)';
+        ctx.fillRect(x, y, f.w, f.h);
+    }
+  }
+}
+
+function drawTeleports(ctx) {
+  const t = Date.now() / 500;
+  for (const tp of teleports) {
+    const x = tp.x;
+    const y = tp.y;
+
+    // 发光效果
+    const pulse = 0.5 + Math.sin(t) * 0.3;
+    ctx.fillStyle = `hsla(280, 70%, 60%, ${pulse * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 传送点图标（根据类型）
+    if (tp.type === 'wardrobe') {
+      // 衣柜
+      ctx.fillStyle = 'hsl(25, 45%, 40%)';
+      ctx.fillRect(x - 10, y - 14, 20, 28);
+      ctx.fillStyle = 'hsl(25, 50%, 50%)';
+      ctx.fillRect(x - 8, y - 12, 7, 24);
+      ctx.fillRect(x + 1, y - 12, 7, 24);
+      // 门把手
+      ctx.fillStyle = 'hsl(45, 70%, 60%)';
+      ctx.fillRect(x - 2, y - 2, 2, 3);
+      ctx.fillRect(x + 0, y - 2, 2, 3);
+    } else if (tp.type === 'cabinet') {
+      // 橱柜
+      ctx.fillStyle = 'hsl(25, 45%, 45%)';
+      ctx.fillRect(x - 12, y - 10, 24, 20);
+      ctx.fillStyle = 'hsl(25, 50%, 55%)';
+      ctx.fillRect(x - 10, y - 8, 9, 8);
+      ctx.fillRect(x + 1, y - 8, 9, 8);
+      ctx.fillRect(x - 10, y + 1, 9, 7);
+      ctx.fillRect(x + 1, y + 1, 9, 7);
+    } else if (tp.type === 'bookshelf') {
+      // 书架暗门
+      ctx.fillStyle = 'hsl(25, 45%, 35%)';
+      ctx.fillRect(x - 10, y - 14, 20, 28);
+      // 发光的书
+      ctx.fillStyle = `hsl(120, 70%, ${50 + Math.sin(t * 2) * 20}%)`;
+      ctx.fillRect(x - 4, y - 4, 8, 10);
+    }
+  }
+}
+
+function drawBooks(ctx) {
+  const t = Date.now() / 300;
+  for (const bs of bookSpawns) {
+    if (!bs.hasBook) continue;
+    const x = bs.x;
+    const y = bs.y;
+
+    // 发光
+    const glow = 0.5 + Math.sin(t) * 0.3;
+    ctx.fillStyle = `hsla(120, 70%, 50%, ${glow * 0.4})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 书本
+    ctx.fillStyle = 'hsl(45, 80%, 60%)';
+    ctx.fillRect(x - 8, y - 10, 16, 20);
+    ctx.fillStyle = 'hsl(30, 70%, 50%)';
+    ctx.fillRect(x - 8, y - 10, 4, 20);
+    // 书页
+    ctx.fillStyle = 'hsl(50, 90%, 90%)';
+    ctx.fillRect(x - 3, y - 8, 10, 16);
+    // 线条
+    ctx.strokeStyle = 'hsl(30, 50%, 40%)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - 1, y - 5);
+    ctx.lineTo(x + 6, y - 5);
+    ctx.moveTo(x - 1, y - 1);
+    ctx.lineTo(x + 6, y - 1);
+    ctx.moveTo(x - 1, y + 3);
+    ctx.lineTo(x + 6, y + 3);
+    ctx.stroke();
+  }
+}
+
+// ---------- 小地图 ----------
+function drawMinimap() {
+  const canvas = document.getElementById('minimap');
+  const ctx = canvas.getContext('2d');
+  const scaleX = canvas.width / (MAP_W * TILE);
+  const scaleY = canvas.height / (MAP_H * TILE);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 背景
+  ctx.fillStyle = 'hsl(40, 45%, 85%)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 墙
+  ctx.fillStyle = 'hsl(25, 35%, 40%)';
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (map[y][x] === 1) {
+        ctx.fillRect(x * TILE * scaleX, y * TILE * scaleY, TILE * scaleX + 1, TILE * scaleY + 1);
+      }
+    }
+  }
+
+  // 家具（简化）
+  ctx.fillStyle = 'hsl(30, 40%, 60%)';
+  for (const f of furniture) {
+    ctx.fillRect(f.x * scaleX, f.y * scaleY, f.w * scaleX, f.h * scaleY);
+  }
+
+  // 妈妈视野（小地图上的红点）
+  ctx.fillStyle = 'hsla(0, 80%, 50%, 0.3)';
+  ctx.beginPath();
+  ctx.arc(game.mom.x * scaleX, game.mom.y * scaleY, VIEW_DIST * scaleX * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 角色
+  ctx.fillStyle = 'hsl(330, 80%, 65%)';
+  ctx.beginPath();
+  ctx.arc(game.girl.x * scaleX, game.girl.y * scaleY, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'hsl(210, 70%, 55%)';
+  ctx.beginPath();
+  ctx.arc(game.dad.x * scaleX, game.dad.y * scaleY, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'hsl(0, 70%, 55%)';
+  ctx.beginPath();
+  ctx.arc(game.mom.x * scaleX, game.mom.y * scaleY, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ---------- HUD 更新 ----------
+function updateHUD() {
+  // 小女孩血量
+  const girlHpEl = document.getElementById('girlHp');
+  girlHpEl.innerHTML = '';
+  for (let i = 0; i < game.girl.maxHp; i++) {
+    const heart = document.createElement('span');
+    heart.innerHTML = i < game.girl.hp ? '❤️' : '🤍';
+    heart.className = 'heart';
+    girlHpEl.appendChild(heart);
+  }
+
+  // 爸爸血量
+  const dadHpEl = document.getElementById('dadHp');
+  dadHpEl.innerHTML = '';
+  for (let i = 0; i < game.dad.maxHp; i++) {
+    const heart = document.createElement('span');
+    heart.innerHTML = i < game.dad.hp ? '❤️' : '🤍';
+    heart.className = 'heart';
+    dadHpEl.appendChild(heart);
+  }
+
+  // 妈妈血量
+  const momHpEl = document.getElementById('momHp');
+  momHpEl.innerHTML = '';
+  for (let i = 0; i < game.mom.maxHp; i++) {
+    const heart = document.createElement('span');
+    heart.innerHTML = i < game.mom.hp ? '💔' : '🖤';
+    heart.className = 'heart';
+    momHpEl.appendChild(heart);
+  }
+
+  // 技能冷却
+  const shieldEl = document.getElementById('girlShieldCd');
+  if (game.girl.shieldActive) {
+    shieldEl.textContent = '激活中';
+    shieldEl.className = 'text-cyan-500 font-bold';
+  } else if (game.girl.shieldCd > 0) {
+    shieldEl.textContent = Math.ceil(game.girl.shieldCd / 1000) + 's';
+    shieldEl.className = 'text-gray-400 font-bold';
+  } else {
+    shieldEl.textContent = '就绪';
+    shieldEl.className = 'text-blue-500 font-bold';
+  }
+
+  const skillEl = document.getElementById('dadSkillCd');
+  if (game.dad.skillCd > 0) {
+    skillEl.textContent = (game.dad.skillCd / 1000).toFixed(1) + 's';
+    skillEl.className = 'text-gray-400 font-bold';
+  } else {
+    skillEl.textContent = '就绪';
+    skillEl.className = 'text-orange-500 font-bold';
+  }
+}
+
+// ---------- 答题系统 ----------
+function startQuiz(bookSpawn) {
+  game.state = 'quiz';
+  game.currentBookSpawn = bookSpawn;
+
+  // 随机选题
+  const categories = ['math', 'chinese', 'english'];
+  const cat = categories[Math.floor(Math.random() * categories.length)];
+  const questions = QUESTIONS[cat];
+  const q = questions[Math.floor(Math.random() * questions.length)];
+  game.currentQuiz = { ...q, category: cat };
+
+  // 显示界面
+  const catNames = { math: '📐 数学题', chinese: '📖 语文题', english: '🔤 英语题' };
+  document.getElementById('quizCategory').textContent = catNames[cat];
+  document.getElementById('quizQuestion').textContent = q.q;
+
+  const optionsEl = document.getElementById('quizOptions');
+  optionsEl.innerHTML = '';
+  q.options.forEach((opt, idx) => {
+    const btn = document.createElement('div');
+    btn.className = 'quiz-option bg-white border-2 border-green-300 rounded-lg p-3 text-center font-bold text-gray-700';
+    btn.textContent = `${String.fromCharCode(65 + idx)}. ${opt}`;
+    btn.onclick = () => answerQuiz(idx);
+    optionsEl.appendChild(btn);
+  });
+
+  document.getElementById('quizResult').classList.add('hidden');
+  document.getElementById('quizCloseBtn').classList.add('hidden');
+  document.getElementById('quizScreen').classList.remove('hidden');
+}
+
+function answerQuiz(idx) {
+  const quiz = game.currentQuiz;
+  const resultEl = document.getElementById('quizResult');
+  const options = document.querySelectorAll('.quiz-option');
+
+  options.forEach((opt, i) => {
+    opt.style.pointerEvents = 'none';
+    if (i === quiz.answer) {
+      opt.style.background = 'hsl(120, 60%, 80%)';
+      opt.style.borderColor = 'hsl(120, 60%, 50%)';
+    } else if (i === idx && i !== quiz.answer) {
+      opt.style.background = 'hsl(0, 60%, 85%)';
+      opt.style.borderColor = 'hsl(0, 60%, 55%)';
+    }
+  });
+
+  resultEl.classList.remove('hidden');
+  if (idx === quiz.answer) {
+    resultEl.textContent = '🎉 答对了！恢复1点生命';
+    resultEl.style.color = 'hsl(120, 60%, 40%)';
+    game.girl.heal(1);
+    Audio.correct();
+  } else {
+    resultEl.textContent = '😅 答错了，下次加油！';
+    resultEl.style.color = 'hsl(0, 60%, 50%)';
+    Audio.wrong();
+  }
+
+  // 书本消失
+  game.currentBookSpawn.hasBook = false;
+  game.currentBookSpawn.respawnAt = Date.now() + BOOK_RESPAWN;
+
+  document.getElementById('quizCloseBtn').classList.remove('hidden');
+}
+
+function closeQuiz() {
+  document.getElementById('quizScreen').classList.add('hidden');
+  game.state = 'playing';
+  game.lastTime = performance.now();
+  game.currentQuiz = null;
+  game.currentBookSpawn = null;
+}
+
+// ---------- 游戏流程控制 ----------
+function startGame() {
+  Audio.init();
+  Audio.startBGM();
+
+  initGame();
+
+  document.getElementById('menuScreen').classList.add('hidden');
+  document.getElementById('overScreen').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('minimap').classList.remove('hidden');
+  document.getElementById('controlsHint').classList.remove('hidden');
+
+  game.state = 'playing';
+  game.lastTime = performance.now();
+
+  if (!game.animId) {
+    game.animId = requestAnimationFrame(gameLoop);
+  }
+}
+
+function pauseGame() {
+  if (game.state !== 'playing') return;
+  game.state = 'paused';
+  document.getElementById('pauseScreen').classList.remove('hidden');
+}
+
+function resumeGame() {
+  if (game.state !== 'paused') return;
+  game.state = 'playing';
+  game.lastTime = performance.now();
+  document.getElementById('pauseScreen').classList.add('hidden');
+}
+
+function endGame(won) {
+  game.state = 'over';
+  Audio.stopBGM();
+
+  if (won) {
+    Audio.win();
+    document.getElementById('overTitle').textContent = '🎉 胜利！';
+    document.getElementById('overTitle').className = 'text-5xl font-bold mb-4 text-green-600';
+    document.getElementById('overMsg').textContent = '爸爸和小女孩成功击败了妈妈！';
+  } else {
+    Audio.lose();
+    document.getElementById('overTitle').textContent = '💔 失败了...';
+    document.getElementById('overTitle').className = 'text-5xl font-bold mb-4 text-red-600';
+    document.getElementById('overMsg').textContent = '被妈妈发现太多次了，下次小心点！';
+  }
+
+  document.getElementById('overScreen').classList.remove('hidden');
+}
+
+// ---------- Canvas 尺寸 ----------
+function resizeCanvas() {
+  const canvas = document.getElementById('gameCanvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  // 计算缩放比例，确保整张地图完整显示
+  const scaleX = canvas.width / CANVAS_W;
+  const scaleY = canvas.height / CANVAS_H;
+  game.scale = Math.min(scaleX, scaleY);
+}
+
+// ---------- 输入处理 ----------
+document.addEventListener('keydown', (e) => {
+  if (e.key in input) {
+    input[e.key] = true;
+    e.preventDefault();
+  }
+  if (e.key === 'q' || e.key === 'Q') {
+    if (game.state === 'playing' && game.girl) {
+      game.girl.useShield();
+    }
+  }
+  if (e.key === ' ') {
+    if (game.state === 'playing' && game.dad) {
+      game.dad.useBoomerang(game.projectiles);
+    }
+    e.preventDefault();
+  }
+  if (e.key === 'Escape') {
+    if (game.state === 'playing') pauseGame();
+    else if (game.state === 'paused') resumeGame();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.key in input) {
+    input[e.key] = false;
+    e.preventDefault();
+  }
+});
+
+// 移动端虚拟按键
+document.querySelectorAll('#mobileControls button').forEach(btn => {
+  const key = btn.dataset.key;
+  const setInput = (val) => {
+    if (key === 'q') {
+      if (val && game.state === 'playing' && game.girl) game.girl.useShield();
+    } else if (key === ' ') {
+      if (val && game.state === 'playing' && game.dad) game.dad.useBoomerang(game.projectiles);
+    } else {
+      input[key] = val;
+    }
+  };
+  btn.addEventListener('touchstart', (e) => { e.preventDefault(); setInput(true); });
+  btn.addEventListener('touchend', (e) => { e.preventDefault(); setInput(false); });
+  btn.addEventListener('mousedown', () => setInput(true));
+  btn.addEventListener('mouseup', () => setInput(false));
+  btn.addEventListener('mouseleave', () => setInput(false));
+});
+
+// 按钮事件
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+document.getElementById('resumeBtn').addEventListener('click', resumeGame);
+document.getElementById('quizCloseBtn').addEventListener('click', closeQuiz);
+
+// 窗口大小变化
+window.addEventListener('resize', resizeCanvas);
+
+// 初始化
+resizeCanvas();
+
+// 启动渲染循环（即使在菜单状态也运行，用于未来扩展）
+game.animId = requestAnimationFrame(gameLoop);
+
+// 页面可见性变化时暂停
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && game.state === 'playing') {
+    pauseGame();
+  }
+});
+</script>
+</body>
+</html>
